@@ -35,7 +35,7 @@ export default function Signup({ state, persist, setState }) {
   // Calculate form completion progress
   useEffect(() => {
     let completed = 0
-    const total = 5 // name, email, mobile, password, confirm
+    const total = 5 
     if (form.name.trim()) completed++
     if (isEmail(form.email)) completed++
     if (isPhone(form.mobile)) completed++
@@ -274,14 +274,13 @@ export default function Signup({ state, persist, setState }) {
             <Card
               sx={{
                 flex: 1,
-                // square left corners on desktop so it can touch the hero
                 borderTopLeftRadius: { xs: 8, sm: 12, md: 0 },
                 borderBottomLeftRadius: { xs: 8, sm: 12, md: 0 },
                 borderTopRightRadius: 15,
                 borderBottomRightRadius: 15,
                 boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
                 border: '1px solid rgba(255,255,255,0.2)',
-                borderLeft: { md: 'none' }, // remove seam between hero and card
+                borderLeft: { md: 'none' }, 
                 backdropFilter: 'blur(10px)',
                 minWidth: 0
               }}

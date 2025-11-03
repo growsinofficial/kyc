@@ -31,7 +31,7 @@ export default function DocCard({ id, title, state, persist }) {
 
   const validateFile = (file) => {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png']
-    const maxSize = 10 * 1024 * 1024 // 10MB
+    const maxSize = 10 * 1024 * 1024  // 10MB
 
     if (!validTypes.includes(file.type)) {
       setError('Please select a valid image file (PNG or JPG)')
@@ -312,7 +312,7 @@ export default function DocCard({ id, title, state, persist }) {
                   onChange={e => { 
                     const f = e.target.files?.[0] 
                     if (f) onChange(f) 
-                    e.target.value = '' // Reset input
+                    e.target.value = '' 
                   }}
                 />
               </Button>

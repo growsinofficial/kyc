@@ -51,7 +51,7 @@ export default function KycAddress({ state, persist }) {
   // Calculate form completion progress
   useEffect(() => {
     let completed = 0
-    const total = 7 // all fields
+    const total = 7 
 
     if (local.address.trim()) completed++
     if (local.city.trim()) completed++
@@ -67,9 +67,7 @@ export default function KycAddress({ state, persist }) {
   const setL = (k, v) => setLocal(prev => ({ ...prev, [k]: v }))
 
   const handleBlur = (field) => () => {
-    setTouched(prev => ({ ...prev, [field]: true }))
-  }
-
+    setTouched(prev => ({ ...prev, [field]: true }))}
   const getFieldColor = (field) => {
     if (errors[field]) return 'error'
     if (touched[field] && local[field]) return 'success'
@@ -95,10 +93,8 @@ export default function KycAddress({ state, persist }) {
 
   const next = async () => {
     if (!validate()) return
-
     setLoading(true)
     await new Promise(resolve => setTimeout(resolve, 800))
-
     persist(s => ({
       ...s,
       userData: { ...s.userData, kyc: { ...s.userData.kyc, ...local } },
@@ -109,7 +105,6 @@ export default function KycAddress({ state, persist }) {
   }
 
   const back = () => persist(s => ({ ...s, kycSubStep: 1 }))
-
   const allFieldsValid = progress === 100
 
   return (
@@ -117,8 +112,7 @@ export default function KycAddress({ state, persist }) {
       <Box>
         {/* Progress Header */}
         <Paper elevation={0} sx={{
-          p: 1.6,
-          mb: 2,
+          p: 1.6, mb: 2,
           background: 'linear-gradient(135deg, #f5f7fa 0%, #e3e8f0 100%)',
           borderRadius: 1.1
         }}>
@@ -130,26 +124,14 @@ export default function KycAddress({ state, persist }) {
               Please provide your current residential address for verification
             </Typography>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="caption" color="text.secondary">
-                Completion Progress
-              </Typography>
-              <Typography variant="caption" fontWeight={600}>
-                {Math.round(progress)}%
-              </Typography>
+              <Typography variant="caption" color="text.secondary">Completion Progress</Typography>
+              <Typography variant="caption" fontWeight={600}>{Math.round(progress)}%</Typography>
             </Stack>
-            <Box sx={{
-              width: '100%',
-              height: 6,
-              backgroundColor: 'grey.200',
-              borderRadius: 3,
-              overflow: 'hidden'
-            }}>
+            <Box sx={{ width: '100%', height: 6, backgroundColor: 'grey.200', borderRadius: 3, overflow: 'hidden' }}>
               <Box sx={{
-                width: `${progress}%`,
-                height: '100%',
+                width: `${progress}%`, height: '100%',
                 background: 'linear-gradient(90deg, #1976d2 0%, #4dabf5 100%)',
-                borderRadius: 3,
-                transition: 'width 0.3s ease'
+                borderRadius: 3, transition: 'width 0.3s ease'
               }} />
             </Box>
           </Stack>
@@ -158,7 +140,8 @@ export default function KycAddress({ state, persist }) {
         <Card sx={{ borderRadius: 1.1, boxShadow: '0 8px 32px rgba(0, 0, 0, 0)' }}>
           <CardContent sx={{ p: 1 }}>
             <Stack spacing={2.2}>
-              {/* Address Field — keep icon visually the same, move text right, prevent selection overlap */}
+
+              {/* Address Field — label moved right, aligned in both states */}
               <Box sx={{ position: 'relative' }}>
                 <TextField
                   multiline
@@ -171,14 +154,24 @@ export default function KycAddress({ state, persist }) {
                   error={!!errors.address && touched.address}
                   color={getFieldColor('address')}
                   fullWidth
+                  InputLabelProps={{
+                    sx: {
+                      transform: 'translate(46px, 16px) scale(1)',
+                      zIndex: 1,
+                      px: 0.5,
+                      backgroundColor: (t) => t.palette.background.paper,
+                      '&.MuiInputLabel-shrink': {
+                        transform: 'translate(16px, -9px) scale(0.75)',
+                      },
+                    },
+                  }}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 1.1,
                       alignItems: 'flex-start',
                     },
-                    // push content to the right so it never touches the icon
                     '& .MuiInputBase-inputMultiline': {
-                      paddingLeft: '56px',     // was 40px; gives clear gap next to the icon
+                      paddingLeft: '56px',   
                       paddingTop: '16px',
                       wordBreak: 'break-word',
                       whiteSpace: 'pre-wrap',
@@ -189,15 +182,15 @@ export default function KycAddress({ state, persist }) {
                     },
                   }}
                 />
-                {/* Icon rendered as sibling OVER the textarea so ::selection can't cover it */}
+                {/* Icon over the field so selection/cursor never overlaps it */}
                 <HomeIcon
                   sx={{
                     position: 'absolute',
                     left: 14,
-                    top: 26,                 // adjust 24–28 if your label size differs
+                    top: 26,
                     color: (t) => t.palette.primary.main,
                     pointerEvents: 'none',
-                    zIndex: 3,               // above the textarea & selection paint
+                    zIndex: 3,
                     opacity: 0.9,
                   }}
                 />
@@ -268,9 +261,7 @@ export default function KycAddress({ state, persist }) {
                     }}
                     SelectProps={{
                       displayEmpty: true,
-                      MenuProps: {
-                        PaperProps: { style: { maxHeight: 280, borderRadius: 12 } },
-                      },
+                      MenuProps: { PaperProps: { style: { maxHeight: 280, borderRadius: 12 } } },
                     }}
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.1 } }}
                   >
@@ -357,11 +348,7 @@ export default function KycAddress({ state, persist }) {
               {/* Status Alert */}
               {allFieldsValid && (
                 <Fade in>
-                  <Alert
-                    severity="success"
-                    variant="outlined"
-                    sx={{ borderRadius: 1.1, border: '1px solid' }}
-                  >
+                  <Alert severity="success" variant="outlined" sx={{ borderRadius: 1.1, border: '1px solid' }}>
                     All address details are complete and validated. Ready to proceed to the next step.
                   </Alert>
                 </Fade>
@@ -383,22 +370,11 @@ export default function KycAddress({ state, persist }) {
                   disabled={loading}
                   endIcon={loading ? <CircularProgress size={20} /> : <ArrowForwardIcon />}
                   sx={{
-                    minWidth: 140,
-                    height: 48,
-                    borderRadius: 1.1,
-                    fontSize: '1rem',
-                    fontWeight: 600,
+                    minWidth: 140, height: 48, borderRadius: 1.1, fontSize: '1rem', fontWeight: 600,
                     background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
                     boxShadow: '0 4px 15px rgba(25, 118, 210, 0.3)',
-                    '&:hover': {
-                      boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)',
-                      transform: 'translateY(-1px)'
-                    },
-                    '&:disabled': {
-                      background: 'grey.300',
-                      transform: 'none',
-                      boxShadow: 'none'
-                    },
+                    '&:hover': { boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)', transform: 'translateY(-1px)' },
+                    '&:disabled': { background: 'grey.300', transform: 'none', boxShadow: 'none' },
                     transition: 'all 0.3s ease'
                   }}
                 >

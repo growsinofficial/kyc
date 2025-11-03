@@ -83,7 +83,7 @@ export default function Payment({ state, onLogout }) {
               boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
               border: '1px solid',
               borderColor: 'grey.100',
-              minWidth: 0, // allow shrink to prevent wrap
+              minWidth: 0,
             }}
           >
             <CardContent sx={{ p: 0 }}>

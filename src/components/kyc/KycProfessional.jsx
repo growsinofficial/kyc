@@ -131,7 +131,6 @@ export default function KycProfessional({ state, persist }) {
 
   return (
     <Fade in timeout={600}>
-      {/* prevent any parent form submit refreshing the page */}
       <Box component="form" onSubmit={(e) => e.preventDefault()}>
         {/* Progress Header */}
         <Paper elevation={0} sx={{
@@ -305,12 +304,12 @@ export default function KycProfessional({ state, persist }) {
                   label="Specify Your Occupation"
                   value={otherLocal}
                   onChange={(e) => {
-                    setOtherLocal(e.target.value)         // <-- ONLY local change here
+                    setOtherLocal(e.target.value)        
                     if (errors.other) setErrors(prev => ({ ...prev, other: '' }))
                   }}
                   onBlur={() => {
                     setTouched(prev => ({ ...prev, other: true }))
-                    setK('otherOccupation', otherLocal)   // <-- sync to global on blur
+                    setK('otherOccupation', otherLocal)   
                   }}
                   error={!!errors.other && touched.other}
                   helperText={errors.other || "Please specify your occupation details"}

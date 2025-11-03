@@ -52,7 +52,7 @@ export default function KycContainer({ state, persist, onLogout, navigateTo }) {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '320px 1fr' }, // left fixed, right fluid
+          gridTemplateColumns: { xs: '1fr', md: '320px 1fr' }, 
           gap: { xs: 2, md: 3 },
           alignItems: 'start',
           mt: 1,

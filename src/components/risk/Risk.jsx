@@ -456,9 +456,9 @@ export default function Risk({ state, persist, onLogout, navigateTo }) {
                     </Typography>
                   </Alert>
                   <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1 }}>
-                    <Button size="small" onClick={() => navigateTo('sign')}>
+                    {/* <Button size="small" onClick={() => navigateTo('sign')}>
                       Review Agreement
-                    </Button>
+                    </Button> */}
                   </Stack>
                   {/* === /Agreement notice === */}
                 </Box>

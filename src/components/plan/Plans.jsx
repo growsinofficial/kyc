@@ -84,11 +84,18 @@ export default function Plans({ state, persist, onLogout, navigateTo }) {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'))
+
+  // keep default selection as your previous logic (exclusive)
   const [selected, setSelected] = useState(state.userData.selectedPlan?.key || 'exclusive')
   const [rebalanceOpen, setRebalanceOpen] = useState(false)
   const [exclusiveOpen, setExclusiveOpen] = useState(false)
   const [portfolioValue, setPortfolioValue] = useState('')
   const [aumValue, setAumValue] = useState('')
+
+  // ---- NEW: show recommended plan first (top/left on grid) ----
+  const displayPlans = useMemo(() => {
+    return [...plans].sort((a, b) => (b.recommended === true) - (a.recommended === true))
+  }, [])
 
   const chosen = useMemo(
     () => plans.find((p) => p.key === selected) || plans[1],
@@ -155,6 +162,7 @@ export default function Plans({ state, persist, onLogout, navigateTo }) {
     <Fade in timeout={500} style={{ transitionDelay: `${index * 100}ms` }}>
       <Card
         sx={{
+          position: 'relative', 
           height: '100%',
           borderRadius: 2,
           border: selected === plan.key ? `2px solid ${theme.palette.primary.main}` : '1px solid',
@@ -174,27 +182,27 @@ export default function Plans({ state, persist, onLogout, navigateTo }) {
           }
         }}
       >
+        {/* ---- NEW: Corner ribbon for RECOMMENDED at the top ---- */}
         {plan.recommended && (
           <Box
             sx={{
               position: 'absolute',
-              top: -10,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 2
+              top: 14,
+              left: -36,
+              transform: 'rotate(-45deg)',
+              bgcolor: theme.palette.primary.main,
+              color: 'white',
+              px: 6,
+              py: 0.6,
+              fontSize: 12,
+              fontWeight: 700,
+              letterSpacing: 0.6,
+              boxShadow: `0 6px 14px ${alpha(theme.palette.primary.main, 0.35)}`,
+              zIndex: 3,
+              userSelect: 'none'
             }}
           >
-            <Chip
-              icon={<StarIcon sx={{ fontSize: 16 }} />}
-              label="RECOMMENDED"
-              size="small"
-              sx={{
-                fontWeight: 600,
-                fontSize: '0.7rem',
-                backgroundColor: theme.palette.primary.main,
-                color: 'white'
-              }}
-            />
+            RECOMMENDED
           </Box>
         )}
 
@@ -211,10 +219,7 @@ export default function Plans({ state, persist, onLogout, navigateTo }) {
             <Typography
               variant="body2"
               color="text.secondary"
-              sx={{
-                mb: 1,
-                fontSize: { xs: '0.85rem', sm: '0.9rem' }
-              }}
+              sx={{ mb: 1, fontSize: { xs: '0.85rem', sm: '0.9rem' } }}
             >
               {plan.subtitle}
             </Typography>
@@ -244,12 +249,7 @@ export default function Plans({ state, persist, onLogout, navigateTo }) {
             {plan.features.map((feature, idx) => (
               <Box key={idx} sx={{ display: 'flex', gap: 1 }}>
                 <CheckCircleIcon
-                  sx={{
-                    fontSize: 16,
-                    color: theme.palette.primary.main,
-                    flexShrink: 0,
-                    mt: 0.3
-                  }}
+                  sx={{ fontSize: 16, color: theme.palette.primary.main, flexShrink: 0, mt: 0.3 }}
                 />
                 <Typography
                   variant="body2"
@@ -274,8 +274,7 @@ export default function Plans({ state, persist, onLogout, navigateTo }) {
               py: 1.2,
               fontSize: { xs: '0.9rem', sm: '1rem' },
               mt: 'auto',
-              backgroundColor:
-                selected === plan.key ? '#175ee2' : theme.palette.primary.main,
+              backgroundColor: selected === plan.key ? '#175ee2' : theme.palette.primary.main,
               '&:hover': { backgroundColor: theme.palette.primary.dark }
             }}
           >
@@ -304,24 +303,15 @@ export default function Plans({ state, persist, onLogout, navigateTo }) {
         <Typography
           variant="body1"
           color="text.secondary"
-          sx={{
-            maxWidth: 600,
-            mx: 'auto',
-            fontSize: { xs: '0.9rem', sm: '1rem' }
-          }}
+          sx={{ maxWidth: 600, mx: 'auto', fontSize: { xs: '0.9rem', sm: '1rem' } }}
         >
           Select the financial planning service that best fits your needs and goals.
         </Typography>
       </Box>
 
       {/* Responsive Grid */}
-      <Grid
-        container
-        spacing={{ xs: 2, sm: 3 }}
-        justifyContent="center"
-        alignItems="stretch"
-      >
-        {plans.map((plan, index) => (
+      <Grid container spacing={{ xs: 2, sm: 3 }} justifyContent="center" alignItems="stretch">
+        {displayPlans.map((plan, index) => (
           <Grid item xs={12} sm={6} md={4} key={plan.key}>
             <PlanCard plan={plan} index={index} />
           </Grid>

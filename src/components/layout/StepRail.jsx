@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, Stack, Typography, useTheme, useMediaQuery, Chip } from '@mui/material'
+import { Box, Stack, Typography, useTheme, useMediaQuery, Chip, alpha } from '@mui/material'
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded'
 import AssignmentTurnedInRoundedIcon from '@mui/icons-material/AssignmentTurnedInRounded'
 import DescriptionRoundedIcon from '@mui/icons-material/DescriptionRounded'
@@ -37,13 +37,13 @@ export default function StepRail({ activeId, state }) {
   const isPaymentDone = !!flags.paymentDone
 
   const steps = [
-    { id: 'kyc',        label: 'KYC Details',  icon: <DescriptionRoundedIcon/>,         done: isKycDone },
-    { id: 'risk',       label: 'Risk Profiling', icon: <AssignmentTurnedInRoundedIcon/>, done: isRiskDone },
-    { id: 'assessment', label: 'Suitability',  icon: <TaskAltRoundedIcon/>,             done: isAssessmentDone },
-    { id: 'docs',       label: 'Upload Docs',  icon: <UploadFileRoundedIcon/>,          done: isDocsDone },
-    { id: 'plan',       label: 'Select Plan',  icon: <RequestQuoteRoundedIcon/>,        done: isPlanDone },
-    { id: 'sign',       label: 'Agreement',    icon: <ReceiptLongRoundedIcon/>,         done: isSignDone },
-    { id: 'payment',    label: 'Payment',      icon: <CreditCardRoundedIcon/>,          done: isPaymentDone },
+    { id: 'kyc',        label: 'KYC Details',    icon: <DescriptionRoundedIcon/>,         done: isKycDone },
+    { id: 'risk',       label: 'Risk Profiling', icon: <AssignmentTurnedInRoundedIcon/>,  done: isRiskDone },
+    { id: 'assessment', label: 'Suitability',    icon: <TaskAltRoundedIcon/>,             done: isAssessmentDone },
+    { id: 'docs',       label: 'Upload Docs',    icon: <UploadFileRoundedIcon/>,          done: isDocsDone },
+    { id: 'plan',       label: 'Select Plan',    icon: <RequestQuoteRoundedIcon/>,        done: isPlanDone },
+    { id: 'sign',       label: 'Agreement',      icon: <ReceiptLongRoundedIcon/>,         done: isSignDone },
+    { id: 'payment',    label: 'Payment',        icon: <CreditCardRoundedIcon/>,          done: isPaymentDone },
   ]
 
   const activeIndex = Math.max(0, steps.findIndex((st) => st.id === activeId))
@@ -52,7 +52,7 @@ export default function StepRail({ activeId, state }) {
   if (isMobile) {
     return (
       <Box sx={{ mb: 3 }}>
-        {/* Progress Bar for Mobile */}
+        {/* Mobile Progress Bar */}
         <Stack spacing={1} sx={{ mb: 2 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
             <Typography variant="caption" fontWeight={600} color="text.secondary">
@@ -62,28 +62,29 @@ export default function StepRail({ activeId, state }) {
               {activeIndex + 1}/{steps.length} Steps
             </Typography>
           </Stack>
-          <Box sx={{ 
-            width: '100%', 
-            height: 6, 
+          <Box sx={{
+            width: '100%',
+            height: 6,
             backgroundColor: 'grey.200',
             borderRadius: 3,
             overflow: 'hidden'
           }}>
-            <Box sx={{ 
-              width: `${progressPercentage}%`, 
+            <Box sx={{
+              width: `${progressPercentage}%`,
               height: '100%',
-              background: 'linear-gradient(90deg, #1976d2 0%, #4dabf5 100%)',
+              background: (activeIndex === steps.length - 1 && isPaymentDone) 
+                ? 'linear-gradient(90deg, #2e7d32 0%, #4caf50 100%)'
+                : 'linear-gradient(90deg, #1976d2 0%, #4dabf5 100%)',
               borderRadius: 3,
               transition: 'width 0.3s ease'
             }} />
           </Box>
         </Stack>
 
-        {/* Current Step Display */}
         <Box sx={{ textAlign: 'center' }}>
           <Chip 
             label={`Step ${activeIndex + 1}: ${steps[activeIndex]?.label}`}
-            color="primary"
+            color={steps[activeIndex]?.done ? "success" : "primary"}
             variant="filled"
             sx={{ fontWeight: 600 }}
           />
@@ -94,27 +95,33 @@ export default function StepRail({ activeId, state }) {
 
   return (
     <Box sx={{ mb: 4 }}>
-      {/* Progress Bar */}
+      {/* Desktop Progress Bar */}
       <Stack spacing={1} sx={{ mb: 2 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Typography variant="body2" fontWeight={600} color="text.secondary">
             Onboarding Progress
           </Typography>
-          <Typography variant="body2" fontWeight={700} color="primary.main">
+          <Typography 
+            variant="body2" 
+            fontWeight={700} 
+            color={activeIndex === steps.length - 1 && isPaymentDone ? "success.main" : "primary.main"}
+          >
             {Math.round(progressPercentage)}% Complete
           </Typography>
         </Stack>
-        <Box sx={{ 
-          width: '100%', 
-          height: 8, 
+        <Box sx={{
+          width: '100%',
+          height: 8,
           backgroundColor: 'grey.200',
           borderRadius: 4,
           overflow: 'hidden'
         }}>
-          <Box sx={{ 
-            width: `${progressPercentage}%`, 
+          <Box sx={{
+            width: `${progressPercentage}%`,
             height: '100%',
-            background: 'linear-gradient(90deg, #1976d2 0%, #4dabf5 100%)',
+            background: (activeIndex === steps.length - 1 && isPaymentDone)
+              ? 'linear-gradient(90deg, #2e7d32 0%, #4caf50 100%)'
+              : 'linear-gradient(90deg, #1976d2 0%, #4dabf5 100%)',
             borderRadius: 4,
             transition: 'width 0.3s ease'
           }} />
@@ -122,51 +129,59 @@ export default function StepRail({ activeId, state }) {
       </Stack>
 
       {/* Steps Rail */}
-      <Stack 
-        direction="row" 
-        alignItems="center" 
-        spacing={isTablet ? 1 : 2} 
-        sx={{ 
-          overflowX: 'auto', 
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={isTablet ? 1 : 2}
+        sx={{
+          overflowX: 'auto',
           pb: 1,
-          '&::-webkit-scrollbar': {
-            height: 6,
-          },
-          '&::-webkit-scrollbar-track': {
-            background: 'grey.100',
-            borderRadius: 3,
-          },
-          '&::-webkit-scrollbar-thumb': {
-            background: 'grey.400',
-            borderRadius: 3,
-          }
+          '&::-webkit-scrollbar': { height: 6 },
+          '&::-webkit-scrollbar-track': { background: 'grey.100', borderRadius: 3 },
+          '&::-webkit-scrollbar-thumb': { background: 'grey.400', borderRadius: 3 }
         }}
       >
         {steps.map((step, idx) => {
           const isActive = step.id === activeId
           const isCompleted = !!step.done
-          const beforeActive = idx < activeIndex
-          const isUpcoming = idx > activeIndex
+          const isPastStep = idx < activeIndex
+          const isFutureStep = idx > activeIndex
 
-          const bulletSize = isTablet ? 32 : 40
-          const bulletBg = isCompleted ? 'success.main' : 
-                          isActive ? 'primary.main' : 
-                          'grey.300'
-          const bulletColor = isCompleted || isActive ? '#fff' : 'grey.600'
-          const bulletBorder = isActive ? `2px solid ${theme.palette.primary.main}` : 'none'
-          const bulletShadow = isActive ? '0 4px 12px rgba(25, 118, 210, 0.3)' : 'none'
-          
-          const connectorColor = idx < activeIndex ? 'primary.main' : 'grey.300'
-          const connectorWidth = isTablet ? '20px' : '40px'
+          const bulletSize = isTablet ? 36 : 44
+          const iconSize = Math.round(bulletSize * 0.58)
+
+          const bulletBg = isCompleted
+            ? '#2e7d32' 
+            : isActive
+            ? theme.palette.primary.main
+            : theme.palette.grey[300]
+
+          const textColor = isCompleted
+            ? 'success.main'
+            : isActive
+            ? 'primary.main'
+            : isPastStep
+            ? 'text.primary'
+            : 'text.secondary'
+
+          const connectorColor = isCompleted || idx < activeIndex
+            ? '#2e7d32' 
+            : theme.palette.grey[300]
+
+          const bulletGlow = isCompleted
+            ? `0 0 0 5px ${alpha('#2e7d32', 0.25)}`
+            : isActive
+            ? `0 0 0 5px ${alpha(theme.palette.primary.main, 0.25)}`
+            : 'none'
 
           return (
             <React.Fragment key={step.id}>
-              <Stack 
-                alignItems="center" 
-                sx={{ 
-                  minWidth: isTablet ? 80 : 96, 
+              <Stack
+                alignItems="center"
+                sx={{
+                  minWidth: isTablet ? 84 : 104,
                   textAlign: 'center',
-                  position: 'relative'
+                  position: 'relative',
                 }}
               >
                 {/* Step Bullet */}
@@ -179,73 +194,53 @@ export default function StepRail({ activeId, state }) {
                     alignItems: 'center',
                     justifyContent: 'center',
                     bgcolor: bulletBg,
-                    color: bulletColor,
-                    border: bulletBorder,
-                    boxShadow: bulletShadow,
-                    transition: 'all 0.3s ease',
-                    position: 'relative',
-                    zIndex: 2
+                    color: '#fff',
+                    boxShadow: bulletGlow,
+                    transition: 'all 0.25s ease',
+                    '& svg': {
+                      width: iconSize,
+                      height: iconSize,
+                    },
                   }}
                 >
                   {isCompleted ? (
-                    <CheckRoundedIcon fontSize={isTablet ? "small" : "medium"} />
+                    <CheckRoundedIcon />
                   ) : (
-                    React.cloneElement(step.icon, { 
-                      fontSize: isTablet ? "small" : "medium" 
+                    React.cloneElement(step.icon, {
+                      sx: { 
+                        color: isActive ? '#fff' : 
+                              isPastStep ? 'grey.600' : 'grey.500'
+                      },
                     })
                   )}
                 </Box>
 
                 {/* Step Label */}
                 <Typography
-                  variant={isTablet ? "caption" : "body2"}
+                  variant={isTablet ? 'caption' : 'body2'}
                   sx={{
                     mt: 2,
-                    fontWeight: isActive ? 700 : 600,
-                    color: isActive ? 'primary.main' : 
-                           beforeActive ? 'text.primary' : 
-                           'text.secondary',
+                    fontWeight: isActive || isCompleted ? 700 : 600,
+                    color: textColor,
                     fontSize: isTablet ? '0.75rem' : '0.875rem',
-                    lineHeight: 1.2,
-                    transition: 'all 0.3s ease'
+                    transition: 'all 0.25s ease',
                   }}
                 >
                   {step.label}
                 </Typography>
-
-                {/* Step Status Badge */}
-                {isCompleted && (
-                  <Box sx={{ position: 'absolute', top: -8, right: -8 }}>
-                    <Box
-                      sx={{
-                        width: 16,
-                        height: 16,
-                        borderRadius: '50%',
-                        backgroundColor: 'success.main',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white'
-                      }}
-                    >
-                      <CheckRoundedIcon sx={{ fontSize: 12 }} />
-                    </Box>
-                  </Box>
-                )}
               </Stack>
 
               {/* Connector Line */}
               {idx < steps.length - 1 && (
-                <Box 
-                  sx={{ 
+                <Box
+                  sx={{
                     flex: isTablet ? 0 : 1,
-                    minWidth: connectorWidth,
-                    height: 3, 
+                    minWidth: isTablet ? 20 : 40,
+                    height: 3,
                     bgcolor: connectorColor,
                     borderRadius: 2,
-                    opacity: idx < activeIndex ? 1 : 0.6,
-                    transition: 'all 0.3s ease'
-                  }} 
+                    transition: 'all 0.25s ease',
+                  }}
                 />
               )}
             </React.Fragment>
@@ -255,9 +250,9 @@ export default function StepRail({ activeId, state }) {
 
       {/* Current Step Indicator */}
       <Box sx={{ textAlign: 'center', mt: 1 }}>
-        <Chip 
+        <Chip
           label={`Current: ${steps[activeIndex]?.label}`}
-          color="primary"
+          color={steps[activeIndex]?.done ? "success" : "primary"}
           variant="outlined"
           size="small"
           sx={{ fontWeight: 600 }}
