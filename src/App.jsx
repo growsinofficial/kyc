@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { 
   Box, 
   Chip, 
@@ -14,14 +14,14 @@ import {
   FormControlLabel,
   Fade
 } from '@mui/material'
-import { useRef } from 'react'
 import { ThemeProvider } from '@mui/material/styles'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { theme } from './theme/theme'
-import { clearCurrentSession, loadCurrentSession, loadUserProgress } from './utils/storage'
+import { clearCurrentSession, loadCurrentSession, loadUserProgress, saveCurrentSession, saveUserProgress } from './utils/storage'
 import { usePersist } from './hooks/usePersist'
 import { getInitialState } from './rootState.js' 
+import apiService from './services/api.js' 
 
 // auth
 import Signup from './components/auth/Signup'
@@ -36,7 +36,7 @@ import SignAgreement from './components/agreement/SignAgreement'
 import Payment from './components/payment/Payment'
 
 // Assessment Component (moved outside)
-function Assessment({ state, navigateTo, onLogout }) {
+function Assessment({ state, navigateTo }) {
   const [scrolled, setScrolled] = React.useState(false)
   const [ack, setAck] = React.useState(false)
   const scrollRef = useRef(null)
@@ -245,15 +245,108 @@ export default function App() {
   const [state, setState] = useState(getInitialState())
   const persist = usePersist(setState)
   const [authTab, setAuthTab] = useState(0) // 0 signup, 1 login
+  const parentOriginRef = useRef('*')
+
+  // Cache parent origin for secure postMessage communication when embedded in Next.js
+  useEffect(() => {
+    if (window.parent !== window) {
+      try {
+        if (document.referrer) {
+          parentOriginRef.current = new URL(document.referrer).origin
+        }
+      } catch (error) {
+        console.warn('Unable to determine parent origin:', error)
+      }
+
+      window.parent.postMessage({ type: 'KYC_LOADED' }, parentOriginRef.current)
+    }
+  }, [])
+
+  // Handle OAuth callbacks
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    const oauthSuccess = urlParams.get('oauth') === 'success'
+    const oauthError = urlParams.get('oauth') === 'error'
+    const errorMessage = urlParams.get('error')
+
+    if (oauthSuccess) {
+      // Clear URL params and show success message
+      window.history.replaceState({}, document.title, window.location.pathname)
+      alert('Gmail OAuth connection successful! Email notifications are now enabled.')
+    } else if (oauthError) {
+      // Clear URL params and show error message
+      window.history.replaceState({}, document.title, window.location.pathname)
+      alert(`Gmail OAuth failed: ${errorMessage || 'Unknown error'}`)
+    }
+  }, [])
 
   // resume session
   useEffect(() => {
+    let hasTriedRestore = false; // Prevent multiple restore attempts
+    
     const logged = loadCurrentSession()
-    if (logged) {
+    const authToken = localStorage.getItem('authToken')
+    
+    if (logged && authToken) {
       const userState = loadUserProgress(logged)
-      if (userState) setState({ ...userState, currentUser: logged })
+      if (userState) {
+        setState({ ...userState, currentUser: logged })
+      }
+    } else if (authToken && !logged && !hasTriedRestore) {
+      hasTriedRestore = true;
+      // If we have a token but no session, try to get user info from API
+      const tryRestoreSession = async () => {
+        try {
+          const userInfo = await apiService.getCurrentUser()
+          if (userInfo && userInfo.user) {
+            const newState = {
+              ...getInitialState(),
+              currentUser: userInfo.user.email,
+              currentStep: userInfo.user.kycStatus === 'completed' ? 'plans' : 'kyc',
+              userData: {
+                name: userInfo.user.name,
+                email: userInfo.user.email,
+                mobile: userInfo.user.mobile,
+                userId: userInfo.user.id
+              },
+              emailVerified: userInfo.user.emailVerified,
+              mobileVerified: userInfo.user.mobileVerified,
+              kycCompleted: userInfo.user.kycStatus === 'completed',
+              riskProfileCompleted: userInfo.user.riskProfile?.completed || false
+            }
+            setState(newState)
+            saveCurrentSession(userInfo.user.email)
+            saveUserProgress(userInfo.user.email, newState)
+          }
+        } catch (error) {
+          console.log('Failed to restore session:', error)
+          // Clear invalid token
+          localStorage.removeItem('authToken')
+          localStorage.removeItem('currentUser')
+        }
+      }
+      
+      // Add a small delay to prevent rapid successive calls
+      setTimeout(tryRestoreSession, 100)
     }
-  }, [])
+  }, []) // Remove dependencies that could cause re-runs
+
+  // Broadcast step changes and completion events to parent shell
+  useEffect(() => {
+    if (window.parent === window) return
+
+    window.parent.postMessage(
+      { type: 'KYC_STEP_CHANGE', data: { step: state.currentStep } },
+      parentOriginRef.current
+    )
+
+    if (state.flags?.paymentDone) {
+      window.parent.postMessage(
+        { type: 'KYC_COMPLETE', data: { user: state.currentUser } },
+        parentOriginRef.current
+      )
+    }
+  }, [state.currentStep, state.flags?.paymentDone, state.currentUser])
 
   const navigateTo = (next) => persist(s => ({ ...s, currentStep: next }))
   const logout = () => { clearCurrentSession(); setState(getInitialState()) }

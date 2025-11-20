@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTP Test Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 10px 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; width: 200px; }
+        .result { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 3px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>🧪 KYC OTP Testing</h1>
+    
+    <div class="test-section">
+        <h2>📧 Email OTP Test</h2>
+        <input type="email" id="emailInput" placeholder="Enter email address" value="test@example.com">
+        <button onclick="testEmailOTP()">Send Email OTP</button>
+        <div id="emailResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📱 Mobile OTP Test</h2>
+        <input type="tel" id="mobileInput" placeholder="Enter mobile number" value="9876543210">
+        <button onclick="testMobileOTP()">Send Mobile OTP</button>
+        <div id="mobileResult" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Server Status</h2>
+        <button onclick="checkServerStatus()">Check Backend Health</button>
+        <div id="statusResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+
+        async function testEmailOTP() {
+            const email = document.getElementById('emailInput').value;
+            const resultDiv = document.getElementById('emailResult');
+            
+            try {
+                resultDiv.innerHTML = '⏳ Sending email OTP...';
+                
+                const response = await fetch(`${API_BASE}/auth/send-email-otp`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Origin': 'http://localhost:5173'
+                    },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        ✅ Email OTP sent successfully!<br>
+                        📧 Email: ${email}<br>
+                        🔑 Test OTP: <strong>${data.testOtp || 'Not provided'}</strong><br>
+                        💬 Message: ${data.message}
+                    `;
+                } else {
+                    throw new Error(data.message || 'Failed to send OTP');
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+
+        async function testMobileOTP() {
+            const mobile = document.getElementById('mobileInput').value;
+            const resultDiv = document.getElementById('mobileResult');
+            
+            try {
+                resultDiv.innerHTML = '⏳ Sending mobile OTP...';
+                
+                const response = await fetch(`${API_BASE}/auth/send-mobile-otp`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Origin': 'http://localhost:5173'
+                    },
+                    body: JSON.stringify({ mobile })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        ✅ Mobile OTP sent successfully!<br>
+                        📱 Mobile: ${mobile}<br>
+                        🔑 Test OTP: <strong>${data.testOtp || 'Not provided'}</strong><br>
+                        💬 Message: ${data.message}
+                    `;
+                } else {
+                    throw new Error(data.message || 'Failed to send OTP');
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+
+        async function checkServerStatus() {
+            const resultDiv = document.getElementById('statusResult');
+            
+            try {
+                resultDiv.innerHTML = '⏳ Checking server status...';
+                
+                const response = await fetch(`${API_BASE}/../health`, {
+                    method: 'GET',
+                    headers: {
+                        'Origin': 'http://localhost:5173'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        ✅ Backend server is running!<br>
+                        🖥️ Status: ${data.status}<br>
+                        📝 Message: ${data.message}<br>
+                        🕒 Timestamp: ${new Date(data.timestamp).toLocaleString()}<br>
+                        📦 Version: ${data.version}
+                    `;
+                } else {
+                    throw new Error('Server responded with error');
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `❌ Backend server error: ${error.message}`;
+            }
+        }
+
+        // Auto-check server status on load
+        window.onload = () => checkServerStatus();
+    </script>
+</body>
+</html>

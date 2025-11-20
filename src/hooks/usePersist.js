@@ -10,7 +10,9 @@ export const usePersist = (setState) => {
           saveUserProgress(snapshot.userData.email, snapshot)
           saveUserProgress(snapshot.userData.mobile, snapshot)
         }
-      } catch {}
+      } catch {
+        // Ignore storage errors in production
+      }
       return snapshot
     })
   }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import {
   Button, Grid, Radio, RadioGroup, Stack, TextField, FormControlLabel, FormLabel,
   Box, Typography, Card, CardContent, Paper, Fade, Alert, useTheme, useMediaQuery,
@@ -16,25 +16,46 @@ import MaleIcon from '@mui/icons-material/Male'
 import TransgenderIcon from '@mui/icons-material/Transgender'
 import FavoriteIcon from '@mui/icons-material/Favorite'
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'
+import apiService from '../../services/api.js'
 
 export default function KycPersonal({ state, persist }) {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const kyc = state.userData.kyc || {}
+  const kycData = state.kycData || {} // Data from MongoDB
+  
+  // Memoize personal data to prevent useEffect dependency issues
+  const personalData = useMemo(() => kycData.personal || {}, [kycData.personal])
 
   const [local, setLocal] = useState({
-    name: kyc.name || state.userData.name || '',
-    fatherName: kyc.fatherName || '',
-    dob: kyc.dob || '',
-    pan: kyc.pan || '',
-    aadhar: kyc.aadhar || '',
-    gender: kyc.gender || '',
-    maritalStatus: kyc.maritalStatus || '',
+    name: personalData.name || kyc.name || state.userData.name || '',
+    fatherName: personalData.fatherName || kyc.fatherName || '',
+    dob: personalData.dob ? personalData.dob.split('T')[0] : kyc.dob || '',
+    pan: personalData.pan || kyc.pan || '',
+    aadhar: personalData.aadhar || kyc.aadhar || '',
+    gender: personalData.gender || kyc.gender || '',
+    maritalStatus: personalData.maritalStatus || kyc.maritalStatus || '',
   })
   const [errors, setErrors] = useState({})
   const [touched, setTouched] = useState({})
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState(0)
+
+  // Update local state when kycData changes (after data is loaded)
+  useEffect(() => {
+    if (personalData && Object.keys(personalData).length > 0) {
+      console.log('🔄 Updating form with loaded personal data:', personalData);
+      setLocal({
+        name: personalData.name || '',
+        fatherName: personalData.fatherName || '',
+        dob: personalData.dob ? personalData.dob.split('T')[0] : '',
+        pan: personalData.pan || '',
+        aadhar: personalData.aadhar || '',
+        gender: personalData.gender || '',
+        maritalStatus: personalData.maritalStatus || '',
+      });
+    }
+  }, [personalData]);
 
   // Calculate form completion progress
   useEffect(() => {
@@ -105,16 +126,27 @@ export default function KycPersonal({ state, persist }) {
     if (!validate()) return
     
     setLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800))
     
-    // write all KYC fields once on Next
-    persist(s => ({
-      ...s,
-      userData: { ...s.userData, name: local.name, kyc: { ...s.userData.kyc, ...local } },
-      kycSubStepStatus: { ...s.kycSubStepStatus, 1: true },
-      kycSubStep: 2,
-    }))
+    try {
+      console.log('🔍 Submitting personal info data:', local)
+      
+      // Submit personal info to backend
+      await apiService.submitPersonalInfo(local)
+      
+      // Update local state on success
+      persist(s => ({
+        ...s,
+        userData: { ...s.userData, name: local.name, kyc: { ...s.userData.kyc, ...local } },
+        kycSubStepStatus: { ...s.kycSubStepStatus, 1: true },
+        kycSubStep: 2,
+      }))
+    } catch (error) {
+      console.error('Failed to submit personal info:', error)
+      console.error('Error details:', error.message)
+      // You could add error handling here, e.g., show a toast
+      setErrors({ general: 'Failed to save personal information. Please try again.' })
+    }
+    
     setLoading(false)
   }
 
@@ -335,7 +367,7 @@ export default function KycPersonal({ state, persist }) {
                     sx={{ gap: 1 }}
                   >
                     <FormControlLabel 
-                      value="male" 
+                      value="Male" 
                       control={<Radio />} 
                       label={
                         <Stack direction="row" alignItems="center" spacing={1}>
@@ -351,7 +383,7 @@ export default function KycPersonal({ state, persist }) {
                       }}
                     />
                     <FormControlLabel 
-                      value="female" 
+                      value="Female" 
                       control={<Radio />} 
                       label={
                         <Stack direction="row" alignItems="center" spacing={1}>
@@ -367,7 +399,7 @@ export default function KycPersonal({ state, persist }) {
                       }}
                     />
                     <FormControlLabel 
-                      value="other" 
+                      value="Other" 
                       control={<Radio />} 
                       label={
                         <Stack direction="row" alignItems="center" spacing={1}>
@@ -409,7 +441,7 @@ export default function KycPersonal({ state, persist }) {
                     sx={{ gap: 1 }}
                   >
                     <FormControlLabel 
-                      value="single" 
+                      value="Single" 
                       control={<Radio />} 
                       label={
                         <Stack direction="row" alignItems="center" spacing={1}>
@@ -425,7 +457,7 @@ export default function KycPersonal({ state, persist }) {
                       }}
                     />
                     <FormControlLabel 
-                      value="married" 
+                      value="Married" 
                       control={<Radio />} 
                       label={
                         <Stack direction="row" alignItems="center" spacing={1}>

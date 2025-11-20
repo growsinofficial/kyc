@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   Alert, Avatar, Button, Card, CardActions, CardContent, CardHeader, InputAdornment,
   Paper, Stack, TextField, Typography, Box, LinearProgress, Fade,
@@ -11,16 +11,15 @@ import LockIcon from '@mui/icons-material/Lock'
 import PersonIcon from '@mui/icons-material/Person'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import RefreshIcon from '@mui/icons-material/Refresh'
-import { userExists, saveCurrentSession, saveUserProgress } from '../../utils/storage'
 import { isEmail, isPhone } from '../../utils/validation'
 import { getInitialState } from '../../rootState.js'
+import apiService from '../../services/api.js'
 
 const DRAFT_KEY = 'signupDraft_v1'
 
 export default function Signup({ state, persist, setState }) {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
-  const isTablet = useMediaQuery(theme.breakpoints.down('md'))
 
   const [form, setForm] = useState({ name: '', email: '', mobile: '', password: '', confirm: '' })
   const [sending, setSending] = useState({ email: false, mobile: false })
@@ -45,10 +44,14 @@ export default function Signup({ state, persist, setState }) {
   }, [form])
 
   // ---- draft persistence helpers ----
-  const saveDraft = (next = {}) => {
+  const saveDraft = useCallback((next = {}) => {
     const payload = { form, otp, verified, ...next }
-    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(payload)) } catch { }
-  }
+    try { 
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(payload)) 
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [form, otp, verified])
 
   const loadDraft = () => {
     try {
@@ -58,10 +61,18 @@ export default function Signup({ state, persist, setState }) {
       if (data?.form) setForm(prev => ({ ...prev, ...data.form }))
       if (data?.otp) setOtp(prev => ({ ...prev, ...data.otp }))
       if (data?.verified) setVerified(prev => ({ ...prev, ...data.verified }))
-    } catch { }
+    } catch {
+      // Ignore localStorage errors
+    }
   }
 
-  const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY) } catch { } }
+  const clearDraft = () => { 
+    try { 
+      localStorage.removeItem(DRAFT_KEY) 
+    } catch {
+      // Ignore localStorage errors
+    }
+  }
 
   // Rehydrate once on mount
   useEffect(() => {
@@ -74,10 +85,12 @@ export default function Signup({ state, persist, setState }) {
   useEffect(() => {
     if (state?.emailVerified && !verified.email) setVerified(v => ({ ...v, email: true }))
     if (state?.mobileVerified && !verified.mobile) setVerified(v => ({ ...v, mobile: true }))
-  }, [state?.emailVerified, state?.mobileVerified])
+  }, [state?.emailVerified, state?.mobileVerified, verified.email, verified.mobile])
 
   // Save draft whenever anything important changes
-  useEffect(() => { saveDraft() }, [form, otp, verified])
+  useEffect(() => { 
+    saveDraft() 
+  }, [saveDraft])
 
   // ---- Field handlers ----
   const handleBlur = (field) => () => setTouched(prev => ({ ...prev, [field]: true }))
@@ -96,42 +109,94 @@ export default function Signup({ state, persist, setState }) {
   // ---- OTP send/verify ----
   const sendEmailOtp = async () => {
     setSending(p => ({ ...p, email: true }))
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    try {
+      const response = await apiService.sendEmailOTP(form.email)
+      console.log('✅ Email OTP Response:', response)
+      
+      // Show success feedback to user
+      if (response.testOtp) {
+        console.log('🔑 Test OTP for email:', response.testOtp)
+        // In test mode, you could auto-fill the OTP
+        // setOtp(prev => ({ ...prev, email: response.testOtp }))
+      }
+      
+      // Clear any previous errors
+      setErrors(e => ({ ...e, email: undefined }))
+      
+    } catch (error) {
+      console.error('❌ Email OTP Error:', error)
+      setErrors(e => ({ ...e, email: 'Failed to send OTP. Please try again.' }))
+    }
     setSending(p => ({ ...p, email: false }))
   }
 
   const sendMobileOtp = async () => {
     setSending(p => ({ ...p, mobile: true }))
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    try {
+      const response = await apiService.sendMobileOTP(form.mobile)
+      console.log('✅ Mobile OTP Response:', response)
+      
+      // Show success feedback to user
+      if (response.testOtp) {
+        console.log('🔑 Test OTP for mobile:', response.testOtp)
+        // In test mode, you could auto-fill the OTP
+        // setOtp(prev => ({ ...prev, mobile: response.testOtp }))
+      }
+      
+      // Clear any previous errors
+      setErrors(e => ({ ...e, mobile: undefined }))
+      
+    } catch (error) {
+      console.error('❌ Mobile OTP Error:', error)
+      setErrors(e => ({ ...e, mobile: 'Failed to send OTP. Please try again.' }))
+    }
     setSending(p => ({ ...p, mobile: false }))
   }
 
   const verifyEmailOtp = async () => {
     setVerifying(p => ({ ...p, email: true }))
-    await new Promise(resolve => setTimeout(resolve, 800))
-    if (otp.email === '123456') {
+    try {
+      await apiService.verifyEmailOTP(form.email, otp.email)
       persist(s => ({ ...s, emailVerified: true }))
       setVerified(v => ({ ...v, email: true }))
       setErrors(e => ({ ...e, emailOtp: undefined }))
       saveDraft({ verified: { ...verified, email: true } })
-    } else {
-      setErrors(e => ({ ...e, emailOtp: 'Invalid OTP. Try 123456' }))
+    } catch (error) {
+      setErrors(e => ({ ...e, emailOtp: error.message || 'Invalid OTP. Please try again.' }))
     }
     setVerifying(p => ({ ...p, email: false }))
   }
 
   const verifyMobileOtp = async () => {
     setVerifying(p => ({ ...p, mobile: true }))
-    await new Promise(resolve => setTimeout(resolve, 800))
-    if (otp.mobile === '654321') {
+    try {
+      await apiService.verifyMobileOTP(form.mobile, otp.mobile)
       persist(s => ({ ...s, mobileVerified: true }))
       setVerified(v => ({ ...v, mobile: true }))
       setErrors(e => ({ ...e, mobileOtp: undefined }))
       saveDraft({ verified: { ...verified, mobile: true } })
-    } else {
-      setErrors(e => ({ ...e, mobileOtp: 'Invalid OTP. Try 654321' }))
+    } catch (error) {
+      setErrors(e => ({ ...e, mobileOtp: error.message || 'Invalid OTP. Please try again.' }))
     }
     setVerifying(p => ({ ...p, mobile: false }))
+  }
+
+  // Clear email verification to allow user to change email
+  const clearEmailVerification = () => {
+    setVerified(v => ({ ...v, email: false }))
+    setOtp(o => ({ ...o, email: '' }))
+    setErrors(e => ({ ...e, emailOtp: undefined, email: undefined }))
+    persist(s => ({ ...s, emailVerified: false }))
+    saveDraft({ verified: { ...verified, email: false } })
+  }
+
+  // Clear mobile verification to allow user to change mobile number
+  const clearMobileVerification = () => {
+    setVerified(v => ({ ...v, mobile: false }))
+    setOtp(o => ({ ...o, mobile: '' }))
+    setErrors(e => ({ ...e, mobileOtp: undefined, mobile: undefined }))
+    persist(s => ({ ...s, mobileVerified: false }))
+    saveDraft({ verified: { ...verified, mobile: false } })
   }
 
   const canContinue = (state?.emailVerified || verified.email) &&
@@ -150,35 +215,51 @@ export default function Signup({ state, persist, setState }) {
     if (!isPhone(form.mobile)) errs.mobile = 'Valid 10-digit mobile number is required'
     if (form.password.length < 8) errs.password = 'Password must be at least 8 characters'
     if (form.password !== form.confirm) errs.confirm = 'Passwords do not match'
-    if (userExists(form.email)) errs.email = 'An account with this email already exists'
-    if (userExists(form.mobile)) errs.mobile = 'An account with this phone number already exists'
 
     setTouched({ name: true, email: true, mobile: true, password: true, confirm: true })
     setErrors(errs)
     if (Object.keys(errs).length) return
 
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    const fresh = getInitialState()
-    const merged = {
-      ...fresh,
-      userData: {
-        ...fresh.userData,
+    try {
+      // Register user with backend API
+      const userData = {
         name: form.name.trim(),
         email: form.email.toLowerCase(),
         mobile: form.mobile,
         password: form.password
-      },
-      currentUser: form.email.toLowerCase(),
-      currentStep: 'kyc',
-      emailVerified: true,
-      mobileVerified: true,
+      }
+
+      const response = await apiService.register(userData)
+      
+      // Create state with user data
+      const fresh = getInitialState()
+      const merged = {
+        ...fresh,
+        userData: {
+          ...fresh.userData,
+          name: form.name.trim(),
+          email: form.email.toLowerCase(),
+          mobile: form.mobile,
+          userId: response.user.id
+        },
+        currentUser: form.email.toLowerCase(),
+        currentStep: 'kyc',
+        emailVerified: true,
+        mobileVerified: true,
+      }
+      
+      clearDraft()
+      setState(merged)
+      
+    } catch (error) {
+      if (error.message.includes('email') && error.message.includes('exists')) {
+        setErrors({ email: 'An account with this email already exists' })
+      } else if (error.message.includes('mobile') && error.message.includes('exists')) {
+        setErrors({ mobile: 'An account with this phone number already exists' })
+      } else {
+        setErrors({ general: error.message || 'Registration failed. Please try again.' })
+      }
     }
-    saveCurrentSession(form.email.toLowerCase())
-    saveUserProgress(form.email.toLowerCase(), merged)
-    saveUserProgress(form.mobile, merged)
-    clearDraft()
-    setState(merged)
   }
 
   const getFieldColor = (field) => {
@@ -191,7 +272,8 @@ export default function Signup({ state, persist, setState }) {
     <Box sx={{
       minHeight: 'auto',
       py: { xs: 2, sm: 3, md: 2 },
-      px: { xs: 1, sm: 2 }
+      px: { xs: 1, sm: 2 },
+      mb: { xs: 2, sm: 0 } // Add bottom margin for mobile
     }}>
       <Box sx={{ maxWidth: 1200, margin: '0 auto', width: '100%' }}>
         <Stack
@@ -213,7 +295,7 @@ export default function Signup({ state, persist, setState }) {
               borderBottomRightRadius: { xs: 2, sm: 3, md: 0 },
               borderTopLeftRadius: { xs: 2, sm: 3, md: 15 },
               borderBottomLeftRadius: { xs: 2, sm: 3, md: 15 },
-              display: 'flex',
+              display: { xs: 'none', md: 'flex' }, // Hide in mobile view
               flexDirection: 'column',
               justifyContent: 'center',
               position: 'relative',
@@ -274,8 +356,8 @@ export default function Signup({ state, persist, setState }) {
             <Card
               sx={{
                 flex: 1,
-                borderTopLeftRadius: { xs: 8, sm: 12, md: 0 },
-                borderBottomLeftRadius: { xs: 8, sm: 12, md: 0 },
+                borderTopLeftRadius: { xs: 15, sm: 15, md: 0 },
+                borderBottomLeftRadius: { xs: 15, sm: 15, md: 0 },
                 borderTopRightRadius: 15,
                 borderBottomRightRadius: 15,
                 boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
@@ -363,7 +445,7 @@ export default function Signup({ state, persist, setState }) {
                         type="email"
                         value={form.email}
                         error={!!errors.email && touched.email}
-                        helperText={errors.email || (touched.email && "We'll send verification code to this email")}
+                        helperText={errors.email || (verified.email ? '✓ Email verified successfully' : touched.email ? "We'll send verification code to this email" : '')}
                         onChange={handleFormChange('email')}
                         onBlur={handleBlur('email')}
                         fullWidth
@@ -382,14 +464,21 @@ export default function Signup({ state, persist, setState }) {
                             position: 'absolute',
                             bottom: -20,
                             whiteSpace: 'nowrap'
+                          },
+                          '& .MuiOutlinedInput-root': {
+                            backgroundColor: verified.email ? 'success.50' : 'background.paper',
+                            '& fieldset': {
+                              borderColor: verified.email ? 'success.main' : undefined,
+                              borderWidth: verified.email ? 2 : 1,
+                            },
                           }
                         }}
                       />
                       <Button
-                        onClick={sendEmailOtp}
-                        disabled={!isEmail(form.email) || verified.email || sending.email}
-                        color={verified.email ? 'success' : 'primary'}
-                        variant={verified.email ? 'contained' : 'outlined'}
+                        onClick={verified.email ? clearEmailVerification : sendEmailOtp}
+                        disabled={!verified.email && (!isEmail(form.email) || sending.email)}
+                        color={verified.email ? 'warning' : 'primary'}
+                        variant={verified.email ? 'text' : 'outlined'}
                         sx={{
                           minWidth: { xs: '100%', sm: 140 },
                           height: { xs: 48, sm: 56 },
@@ -399,7 +488,7 @@ export default function Signup({ state, persist, setState }) {
                         }}
                         startIcon={verified.email ? <CheckCircleIcon /> : sending.email ? <CircularProgress size={20} /> : null}
                       >
-                        {sending.email ? 'Sending' : verified.email ? 'Verified' : 'Send OTP'}
+                        {verified.email ? 'Change' : sending.email ? 'Sending' : 'Send OTP'}
                       </Button>
                     </Stack>
                   </Box>
@@ -453,6 +542,7 @@ export default function Signup({ state, persist, setState }) {
                         label="Mobile Number"
                         value={form.mobile}
                         error={!!errors.mobile && touched.mobile}
+                        helperText={errors.mobile || (verified.mobile ? '✓ Mobile number verified successfully' : touched.mobile ? "We'll send verification code to this number" : '')}
                         onChange={handleMobileChange}
                         onBlur={handleBlur('mobile')}
                         fullWidth
@@ -471,14 +561,21 @@ export default function Signup({ state, persist, setState }) {
                             position: 'absolute',
                             bottom: -20,
                             whiteSpace: 'nowrap'
+                          },
+                          '& .MuiOutlinedInput-root': {
+                            backgroundColor: verified.mobile ? 'success.50' : 'background.paper',
+                            '& fieldset': {
+                              borderColor: verified.mobile ? 'success.main' : undefined,
+                              borderWidth: verified.mobile ? 2 : 1,
+                            },
                           }
                         }}
                       />
                       <Button
-                        onClick={sendMobileOtp}
-                        disabled={!isPhone(form.mobile) || verified.mobile || sending.mobile}
-                        color={verified.mobile ? 'success' : 'primary'}
-                        variant={verified.mobile ? 'contained' : 'outlined'}
+                        onClick={verified.mobile ? clearMobileVerification : sendMobileOtp}
+                        disabled={!verified.mobile && (!isPhone(form.mobile) || sending.mobile)}
+                        color={verified.mobile ? 'warning' : 'primary'}
+                        variant={verified.mobile ? 'text' : 'outlined'}
                         sx={{
                           minWidth: { xs: '100%', sm: 140 },
                           height: { xs: 48, sm: 56 },
@@ -488,7 +585,7 @@ export default function Signup({ state, persist, setState }) {
                         }}
                         startIcon={verified.mobile ? <CheckCircleIcon /> : sending.mobile ? <CircularProgress size={20} /> : null}
                       >
-                        {sending.mobile ? 'Sending' : verified.mobile ? 'Verified' : 'Send OTP'}
+                        {verified.mobile ? 'Change' : sending.mobile ? 'Sending' : 'Send OTP'}
                       </Button>
                     </Stack>
                   </Box>
@@ -620,7 +717,7 @@ export default function Signup({ state, persist, setState }) {
                 </Stack>
               </CardContent>
 
-              <CardActions sx={{ p: { xs: 2, sm: 3 }, pt: 0 }}>
+              <CardActions sx={{ p: { xs: 2, sm: 3 }, pt: 0, pb: { xs: 4, sm: 3 } }}>
                 <Button
                   fullWidth
                   disabled={!canContinue}

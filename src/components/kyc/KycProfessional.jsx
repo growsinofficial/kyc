@@ -8,6 +8,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import WorkIcon from '@mui/icons-material/Work'
+import apiService from '../../services/api.js'
 import BusinessCenterIcon from '@mui/icons-material/BusinessCenter'
 import SchoolIcon from '@mui/icons-material/School'
 import PersonIcon from '@mui/icons-material/Person'
@@ -17,8 +18,8 @@ import HomeIcon from '@mui/icons-material/Home'
 import BeachAccessIcon from '@mui/icons-material/BeachAccess'
 
 export default function KycProfessional({ state, persist }) {
-  const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
+  const _theme = useTheme()
+    const _isMobile = useMediaQuery('(max-width:900px)')
   const kyc = state.userData.kyc || {}
 
   const [errors, setErrors] = useState({})
@@ -111,12 +112,30 @@ export default function KycProfessional({ state, persist }) {
     if (!validate()) return
 
     setLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 300))
-    persist(s => ({
-      ...s,
-      kycSubStepStatus: { ...s.kycSubStepStatus, 3: true },
-      kycSubStep: 4
-    }))
+    
+    try {
+      // Prepare professional data for submission
+      const professionalData = {
+        occupation: kyc.occupation,
+        otherOccupation: kyc.occupation === 'Others' ? otherLocal : '',
+        income: kyc.income,
+        experience: kyc.experience
+      }
+      
+      // Submit professional info to backend
+      await apiService.submitProfessionalInfo(professionalData)
+      
+      // Update local state on success
+      persist(s => ({
+        ...s,
+        kycSubStepStatus: { ...s.kycSubStepStatus, 3: true },
+        kycSubStep: 4
+      }))
+    } catch (error) {
+      console.error('Failed to submit professional info:', error)
+      setErrors({ general: 'Failed to save professional information. Please try again.' })
+    }
+    
     setLoading(false)
   }
 

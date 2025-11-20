@@ -104,7 +104,7 @@ export default function KycReview({ state, persist, goRisk }) {
     return { completed: completedFields, total: totalFields }
   }
 
-  const completion = getCompletionStatus()
+  const _completion = getCompletionStatus()
 
   return (
     <Fade in timeout={600}>

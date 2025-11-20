@@ -145,7 +145,7 @@ export default function StepRail({ activeId, state }) {
           const isActive = step.id === activeId
           const isCompleted = !!step.done
           const isPastStep = idx < activeIndex
-          const isFutureStep = idx > activeIndex
+          const _isFutureStep = idx > activeIndex
 
           const bulletSize = isTablet ? 36 : 44
           const iconSize = Math.round(bulletSize * 0.58)

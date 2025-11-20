@@ -19,6 +19,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import ErrorIcon from '@mui/icons-material/Error'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import DeleteIcon from '@mui/icons-material/Delete'
+import apiService from '../../services/api.js'
 import CloseIcon from '@mui/icons-material/Close'
 
 export default function DocCard({ id, title, state, persist }) {
@@ -67,41 +68,33 @@ export default function DocCard({ id, title, state, persist }) {
     }, 100)
 
     try {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const data = e.target?.result
-        clearInterval(progressInterval)
-        setProgress(100)
-        
-        setTimeout(() => {
-          persist(s => ({ 
-            ...s, 
-            userData: { 
-              ...s.userData, 
-              kyc: { 
-                ...s.userData.kyc, 
-                [`doc_${id}`]: data 
-              }, 
-              docsStatus: { 
-                ...s.userData.docsStatus, 
-                [id]: true 
-              } 
-            } 
-          }))
-          setUploading(false)
-          setProgress(0)
-        }, 500)
-      }
-      reader.onerror = () => {
-        clearInterval(progressInterval)
-        setError('Failed to read file. Please try again.')
-        setUploading(false)
-        setProgress(0)
-      }
-      reader.readAsDataURL(file)
-    } catch (err) {
-      clearInterval(progressInterval)
-      setError('An error occurred during upload.')
+      // Upload document to backend
+      const response = await apiService.uploadDocument(id, file)
+      
+      setProgress(100)
+      
+      // Update state with uploaded document info
+      persist(s => ({ 
+        ...s, 
+        userData: { 
+          ...s.userData, 
+          kyc: { 
+            ...s.userData.kyc, 
+            [`doc_${id}`]: response.url || response.data 
+          }, 
+          docsStatus: { 
+            ...s.userData.docsStatus, 
+            [id]: true 
+          } 
+        } 
+      }))
+      
+      setUploading(false)
+      setProgress(0)
+      
+    } catch (error) {
+      console.error('Upload failed:', error)
+      setError(error.message || 'Upload failed. Please try again.')
       setUploading(false)
       setProgress(0)
     }

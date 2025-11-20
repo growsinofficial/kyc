@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import {
   Card,
   CardContent,
@@ -19,11 +19,49 @@ import KycProfessional from './KycProfessional'
 import KycReview from './KycReview'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
+import { fetchKycData } from '../../services/api'
 
 export default function KycContainer({ state, persist, onLogout, navigateTo }) {
   const theme = useTheme()
   const isDownMd = useMediaQuery(theme.breakpoints.down('md'))
-  const { kycSubStep, kycSubStepStatus } = state
+  const { kycSubStep, kycSubStepStatus = {} } = state // Add default empty object
+
+  // Fetch existing KYC data when component loads
+  useEffect(() => {
+    const loadKycData = async () => {
+      try {
+        console.log('🔍 Loading existing KYC data...');
+        const response = await fetchKycData();
+        console.log('📄 KYC data loaded:', response);
+        
+        if (response.success && response.data) {
+          const { personal, address, professional } = response.data;
+          
+          // Update state with existing data
+          persist((s) => ({
+            ...s,
+            kycData: {
+              personal: personal || {},
+              address: address || {},
+              professional: professional || {}
+            },
+            kycSubStepStatus: {
+              1: personal && Object.keys(personal).length > 0,
+              2: address && Object.keys(address).length > 0,
+              3: professional && Object.keys(professional).length > 0,
+              4: false // Review step is never "completed" until final submission
+            }
+          }));
+          
+          console.log('✅ KYC data restored to state');
+        }
+      } catch (error) {
+        console.error('❌ Error loading KYC data:', error);
+      }
+    };
+
+    loadKycData();
+  }, [persist]); // Include persist dependency
 
   const steps = [
     { id: 1, label: 'Personal', subtitle: 'Basic information' },

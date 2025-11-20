@@ -27,11 +27,12 @@ import PhoneIcon from '@mui/icons-material/Phone'
 import EmailIcon from '@mui/icons-material/Email'
 import PlaceIcon from '@mui/icons-material/Place'
 import { indianStates } from '../../constants/indianStates'
+import apiService from '../../services/api.js'
 import { isEmail, isPincode, isPhone } from '../../utils/validation'
 
 export default function KycAddress({ state, persist }) {
-  const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
+  const _theme = useTheme()
+    const _isMobile = useMediaQuery('(max-width:900px)')
   const kyc0 = state.userData.kyc || {}
 
   const [local, setLocal] = useState({
@@ -94,13 +95,23 @@ export default function KycAddress({ state, persist }) {
   const next = async () => {
     if (!validate()) return
     setLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 800))
-    persist(s => ({
-      ...s,
-      userData: { ...s.userData, kyc: { ...s.userData.kyc, ...local } },
-      kycSubStepStatus: { ...s.kycSubStepStatus, 2: true },
-      kycSubStep: 3,
-    }))
+    
+    try {
+      // Submit address info to backend
+      await apiService.submitAddressInfo(local)
+      
+      // Update local state on success
+      persist(s => ({
+        ...s,
+        userData: { ...s.userData, kyc: { ...s.userData.kyc, ...local } },
+        kycSubStepStatus: { ...s.kycSubStepStatus, 2: true },
+        kycSubStep: 3,
+      }))
+    } catch (error) {
+      console.error('Failed to submit address info:', error)
+      setErrors({ general: 'Failed to save address information. Please try again.' })
+    }
+    
     setLoading(false)
   }
 

@@ -13,7 +13,9 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import PersonIcon from '@mui/icons-material/Person'
 import { isPhone, isEmail } from '../../utils/validation'
-import { loadUserProgress, saveCurrentSession, userExists } from '../../utils/storage'
+import { saveCurrentSession, saveUserProgress } from '../../utils/storage'
+import { getInitialState } from '../../rootState.js'
+import apiService from '../../services/api.js'
 
 export default function Login({ setState }) {
   const theme = useTheme()
@@ -43,26 +45,56 @@ export default function Login({ setState }) {
     if (!pwd) {
       return setErr('Please enter your password')
     }
-    if (!userExists(id)) {
-      return setErr('No account found with this email or phone. Please sign up.')
-    }
 
     setLoading(true)
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    try {
+      // Login with backend API
+      const credentials = {
+        identifier: id, // Can be email or mobile
+        password: pwd
+      }
 
-    const userState = loadUserProgress(id)
-    if (userState?.userData?.password === pwd) {
-      saveCurrentSession(userState.userData.email)
-      setState({
-        ...userState,
-        currentUser: userState.userData.email,
-        currentStep: userState.currentStep || 'kyc'
+      const response = await apiService.login(credentials)
+      
+      // On successful login, update state while preserving structure
+      setState(prevState => {
+        const newState = {
+          ...prevState, // Preserve existing state structure (including kycSubStepStatus)
+          currentUser: response.user.email,
+          currentStep: response.user.kycStatus === 'completed' ? 'plans' : 'kyc',
+          userData: {
+            ...prevState.userData, // Preserve existing userData structure
+            name: response.user.name,
+            email: response.user.email,
+            mobile: response.user.mobile,
+            userId: response.user.id
+          },
+          emailVerified: response.user.emailVerified,
+          mobileVerified: response.user.mobileVerified,
+          kycCompleted: response.user.kycStatus === 'completed',
+          riskProfileCompleted: response.user.riskProfile?.completed || false
+        }
+        
+        // Save session for persistence across page refreshes
+        saveCurrentSession(response.user.email)
+        saveUserProgress(response.user.email, newState)
+        
+        return newState
       })
-    } else {
-      setErr('Incorrect password. Please try again.')
+      
+    } catch (error) {
+      if (error.message.includes('not found') || error.message.includes('No account')) {
+        setErr('No account found with this email or phone. Please sign up.')
+      } else if (error.message.includes('password') || error.message.includes('Invalid')) {
+        setErr('Incorrect password. Please try again.')
+      } else if (error.message.includes('locked')) {
+        setErr('Account temporarily locked due to too many failed attempts. Please try again later.')
+      } else {
+        setErr(error.message || 'Login failed. Please try again.')
+      }
     }
+    
     setLoading(false)
   }
 
@@ -77,25 +109,28 @@ export default function Login({ setState }) {
       return
     }
 
-    if (!userExists(resetEmail)) {
-      setErr('No account found with this email address')
-      return
-    }
-
     setResetLoading(true)
 
-    // Simulate sending reset email
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    try {
+      await apiService.forgotPassword(resetEmail)
+      setResetSent(true)
+      setErr('')
+      
+      // Auto close after success
+      setTimeout(() => {
+        setForgotPasswordOpen(false)
+        setResetSent(false)
+        setResetEmail('')
+      }, 3000)
+    } catch (error) {
+      if (error.message.includes('not found') || error.message.includes('No account')) {
+        setErr('No account found with this email address')
+      } else {
+        setErr(error.message || 'Failed to send reset email. Please try again.')
+      }
+    }
 
     setResetLoading(false)
-    setResetSent(true)
-
-    // Auto close after success
-    setTimeout(() => {
-      setForgotPasswordOpen(false)
-      setResetSent(false)
-      setResetEmail('')
-    }, 3000)
   }
 
   const handleKeyPress = (e) => {
@@ -127,10 +162,6 @@ export default function Login({ setState }) {
     if (touched[field] && (field === 'id' ? id : pwd)) return 'success'
     return 'primary'
   }
-
-  const idAdornmentIcon = isPhone(id)
-    ? <PhoneIcon color={getFieldColor('id')} />
-    : <EmailIcon color={getFieldColor('id')} />
 
   return (
     <>
@@ -276,7 +307,10 @@ export default function Login({ setState }) {
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
-                            <PersonIcon color={getFieldColor('id')} />
+                            {isPhone(id) ? 
+                              <PhoneIcon color={getFieldColor('id')} /> : 
+                              <EmailIcon color={getFieldColor('id')} />
+                            }
                           </InputAdornment>
                         ),
                       }}

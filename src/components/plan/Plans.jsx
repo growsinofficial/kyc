@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   Box,
   Button,
@@ -25,6 +25,7 @@ import ActiveHeader from '../layout/ActiveHeader'
 import StepRail from '../layout/StepRail'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import StarIcon from '@mui/icons-material/Star'
+import apiService from '../../services/api.js'
 
 const plans = [
   {
@@ -82,8 +83,12 @@ const plans = [
 
 export default function Plans({ state, persist, onLogout, navigateTo }) {
   const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
-  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'))
+  const _isMobile = useMediaQuery(theme.breakpoints.down('sm'))
+  const _isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'))
+
+  // State for plans fetched from backend
+  const [backendPlans, setBackendPlans] = useState([])
+  const [_plansLoading, setPlansLoading] = useState(true)
 
   // keep default selection as your previous logic (exclusive)
   const [selected, setSelected] = useState(state.userData.selectedPlan?.key || 'exclusive')
@@ -92,14 +97,37 @@ export default function Plans({ state, persist, onLogout, navigateTo }) {
   const [portfolioValue, setPortfolioValue] = useState('')
   const [aumValue, setAumValue] = useState('')
 
-  // ---- NEW: show recommended plan first (top/left on grid) ----
-  const displayPlans = useMemo(() => {
-    return [...plans].sort((a, b) => (b.recommended === true) - (a.recommended === true))
+  // Fetch plans from backend on component mount
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const response = await apiService.getPlans()
+        // Merge backend plans with default structure
+        const mergedPlans = response.plans || plans
+        setBackendPlans(mergedPlans)
+      } catch (error) {
+        console.error('Failed to fetch plans:', error)
+        // Fallback to default plans if backend fails
+        setBackendPlans(plans)
+      } finally {
+        setPlansLoading(false)
+      }
+    }
+    
+    fetchPlans()
   }, [])
 
+  // Use backend plans if available, otherwise use default plans
+  const currentPlans = backendPlans.length > 0 ? backendPlans : plans
+
+  // ---- NEW: show recommended plan first (top/left on grid) ----
+  const displayPlans = useMemo(() => {
+    return [...currentPlans].sort((a, b) => (b.recommended === true) - (a.recommended === true))
+  }, [currentPlans])
+
   const chosen = useMemo(
-    () => plans.find((p) => p.key === selected) || plans[1],
-    [selected]
+    () => currentPlans.find((p) => p.key === selected) || currentPlans[1],
+    [selected, currentPlans]
   )
 
   const applySelection = (planObj) => {

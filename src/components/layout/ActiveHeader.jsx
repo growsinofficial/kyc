@@ -15,7 +15,7 @@ import PersonIcon from '@mui/icons-material/Person'
 export default function ActiveHeader({ state, onLogout }) {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
-  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'))
+    const _isTablet = useMediaQuery('(max-width: 1024px)')
 
   // Time-based greeting
   const getWelcomeMessage = () => {

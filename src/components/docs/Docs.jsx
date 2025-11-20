@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   Button, 
   Card, 
@@ -30,19 +30,19 @@ export default function Docs({ state, persist, onLogout, navigateTo }) {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const [uploadProgress, setUploadProgress] = useState(0)
   
-  const documents = [
+  const documents = useMemo(() => [
     { id: 'pan', title: 'PAN Card', description: 'Upload clear image of your PAN card' },
     { id: 'aadhaar-front', title: 'Aadhaar Card (Front)', description: 'Front side with photo and details' },
     { id: 'aadhaar-back', title: 'Aadhaar Card (Back)', description: 'Back side with QR code' },
     { id: 'profile', title: 'Profile Photo', description: 'Recent passport size photo' },
-  ]
+  ], [])
 
   // Calculate upload progress
   useEffect(() => {
     const uploadedCount = documents.filter(doc => state.userData.docsStatus?.[doc.id]).length
     const progress = (uploadedCount / documents.length) * 100
     setUploadProgress(progress)
-  }, [state.userData.docsStatus])
+  }, [state.userData.docsStatus, documents])
 
   const allUploaded = Object.values(state.userData.docsStatus || {}).every(Boolean)
   const uploadedCount = documents.filter(doc => state.userData.docsStatus?.[doc.id]).length

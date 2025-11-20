@@ -16,6 +16,7 @@ import {
 } from '@mui/material'
 import ActiveHeader from '../layout/ActiveHeader'
 import StepRail from '../layout/StepRail'
+import apiService from '../../services/api.js'
 import PaymentIcon from '@mui/icons-material/Payment'
 import PersonIcon from '@mui/icons-material/Person'
 import LocationOnIcon from '@mui/icons-material/LocationOn'
@@ -27,7 +28,7 @@ import SecurityIcon from '@mui/icons-material/Security'
 
 export default function Payment({ state, onLogout }) {
   const theme = useTheme()
-  const isDownMd = useMediaQuery(theme.breakpoints.down('md'))
+  const _isDownMd = useMediaQuery(theme.breakpoints.down('md'))
   const [processing, setProcessing] = useState(false)
 
   const md = state.userData.kyc || {}
@@ -36,8 +37,35 @@ export default function Payment({ state, onLogout }) {
 
   const handlePayment = async () => {
     setProcessing(true)
-    await new Promise((r) => setTimeout(r, 2000))
-    alert('Payment flow stubbed. Integrate Razorpay/Stripe as needed.')
+    
+    try {
+      // Get the selected plan details
+      const selectedPlan = state.userData.selectedPlan
+      if (!selectedPlan) {
+        alert('No plan selected. Please go back and select a plan.')
+        setProcessing(false)
+        return
+      }
+
+      // Initiate payment with backend
+      const paymentResponse = await apiService.initiatePayment(selectedPlan.key, 'zoho')
+      
+      // Handle Zoho payment redirect or modal
+      if (paymentResponse.paymentUrl) {
+        // Redirect to Zoho payment page
+        window.location.href = paymentResponse.paymentUrl
+      } else if (paymentResponse.orderDetails) {
+        // Handle inline payment (if Zoho supports it)
+        // This would typically open a payment modal/iframe
+        console.log('Payment order created:', paymentResponse.orderDetails)
+        alert('Payment integration with Zoho is ready. Redirecting to payment gateway...')
+      }
+      
+    } catch (error) {
+      console.error('Payment initiation failed:', error)
+      alert(`Payment failed: ${error.message}. Please try again.`)
+    }
+    
     setProcessing(false)
   }
 

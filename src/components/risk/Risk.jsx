@@ -26,6 +26,7 @@ import {
   CircularProgress,
   Divider
 } from '@mui/material'
+import apiService from '../../services/api.js'
 
 // SVG Icons as React components to avoid import blocking
 const PsychologyIcon = () => (
@@ -128,7 +129,7 @@ const QuestionItem = memo(({
     const currentAnswers = answer || [];
     const newAnswers = checked
       ? [...currentAnswers, option]
-      : current.filter((x) => x !== option);
+      : currentAnswers.filter((x) => x !== option);
     onAnswerChange(question.id, newAnswers);
   }, [question.id, answer, onAnswerChange]);
 
@@ -264,9 +265,9 @@ const QuestionItem = memo(({
   );
 });
 
-export default function Risk({ state, persist, onLogout, navigateTo }) {
+export default function Risk({ state, persist, navigateTo }) {
   const theme = useTheme()
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
+  const _isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const [answers, setAnswers] = useState(state.userData.riskAnswers || {})
   const [loading, setLoading] = useState(false)
 
@@ -319,8 +320,18 @@ export default function Risk({ state, persist, onLogout, navigateTo }) {
     }));
     
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    navigateTo('assessment');
+    
+    try {
+      // Submit risk profile to backend
+      await apiService.submitRiskProfile(answers)
+      
+      // Navigate to assessment on success
+      navigateTo('assessment');
+    } catch (error) {
+      console.error('Failed to submit risk profile:', error)
+      // Could add error handling here
+    }
+    
     setLoading(false);
   };
 
