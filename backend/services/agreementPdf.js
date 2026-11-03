@@ -1,4 +1,5 @@
 import fs from 'fs';
+import mongoose from 'mongoose';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
@@ -20,6 +21,14 @@ async function loadTemplate() {
   if (templateCache) return templateCache;
   const p = templatePath();
   if (!fs.existsSync(p)) {
+    // Hosted setups can keep the template in the database instead (scripts/uploadTemplate.js).
+    const doc = mongoose.connection.readyState === 1
+      ? await mongoose.connection.db.collection('private_assets').findOne({ _id: 'agreement-template' })
+      : null;
+    if (doc?.data) {
+      templateCache = Buffer.from(doc.data.buffer ?? doc.data);
+      return templateCache;
+    }
     const err = new Error(`Agreement template not found at ${p}. Copy the signed-off agreement PDF there (see backend/.env.example).`);
     err.statusCode = 500;
     throw err;
