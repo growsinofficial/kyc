@@ -65,6 +65,20 @@ router.put('/coupon', express.json(), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Read-only: where a client is in the flow (account flags, agreement, payment orders).
+router.get('/client-status', async (req, res, next) => {
+  try {
+    if (!tokenOk(req.get('x-setup-token'))) return res.status(404).json({ success: false, message: 'Not found' });
+    const { User, Agreement, PaymentOrder } = await import('../models/index.js');
+    const mobile = String(req.query.mobile || '').replace(/\D/g, '').slice(-10);
+    const user = await User.findOne({ mobile }).select('name flags subscriptionStatus createdAt');
+    if (!user) return res.json({ success: true, found: false });
+    const agreements = await Agreement.find({ userId: user._id }).sort({ createdAt: -1 }).select('status esign.status esign.requestedAt esign.signedAt createdAt').lean();
+    const orders = await PaymentOrder.find({ userId: user._id }).sort({ createdAt: -1 }).select('status gateway amountPaise couponCode gatewayPaymentId paidAt createdAt').lean();
+    res.json({ success: true, found: true, name: user.name, flags: user.flags, subscriptionStatus: user.subscriptionStatus, createdAt: user.createdAt, agreements, orders });
+  } catch (e) { next(e); }
+});
+
 // Remove a client and all their data by mobile number. Dry run unless { confirm: true }.
 router.post('/delete-user', express.json(), async (req, res, next) => {
   try {
