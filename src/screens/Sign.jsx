@@ -7,6 +7,14 @@ import { digitsOnly, formatDate } from '../constants/options'
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+// Share one in-flight "start eSign" call per agreement, so the screen never asks
+// Digio for two requests at once (Digio rejects the second as a duplicate).
+const esignCalls = new Map()
+const startEsignOnce = (id) => {
+  if (!esignCalls.has(id)) esignCalls.set(id, api.startEsign(id).finally(() => esignCalls.delete(id)))
+  return esignCalls.get(id)
+}
+
 export default function Sign({ agreement, onSigned, onBack }) {
   const toast = useToast()
   const [pdf, setPdf] = useState(null)
@@ -36,9 +44,10 @@ export default function Sign({ agreement, onSigned, onBack }) {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await api.startEsign(current.id)
+        const res = await startEsignOnce(current.id)
         if (cancelled) return
         setEsign(res.esign)
+        setPrepErr('')
       } catch (e) {
         if (!cancelled) setPrepErr(e.message)
       }
@@ -80,7 +89,7 @@ export default function Sign({ agreement, onSigned, onBack }) {
     setPhase('working')
     try {
       // Ask again so the link's one-hour Digio token is always fresh.
-      const res = await api.startEsign(current.id)
+      const res = await startEsignOnce(current.id)
       if (!res.esign?.signUrl) throw new Error('Could not open Digio. Please try again.')
       window.location.assign(res.esign.signUrl)
     } catch (e) {
@@ -155,7 +164,7 @@ export default function Sign({ agreement, onSigned, onBack }) {
                 <span className="mark" aria-hidden="true" />
                 <span>I have read the agreement, risk profile and disclosure document, and I consent to authenticate with my Aadhaar number and OTP to eSign it. Aadhaar details are used only for authentication with UIDAI.</span>
               </label>
-              {prepErr && <p className="err-box" role="alert">{prepErr}</p>}
+              {prepErr && !esign && <p className="err-box" role="alert">{prepErr}</p>}
               {err && <p className="err-box" role="alert">{err}</p>}
               <p className="note">You will be taken to Digio's secure page. Enter your Aadhaar number and the OTP sent to your Aadhaar-linked mobile, and you will come back here automatically.</p>
             </div>

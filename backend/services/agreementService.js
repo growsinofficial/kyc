@@ -63,7 +63,21 @@ const signerIdentifier = (user, agreement, type) => {
 // Digio's gateway access token lasts about an hour; make a fresh request before then.
 const ACCESS_TOKEN_MAX_AGE_MS = 50 * 60 * 1000;
 
-export async function startEsign(userId, id, returnBase) {
+// One Digio request per agreement at a time: two calls arriving together (e.g. the
+// Sign screen preparing the request while the client taps Sign) used to create two
+// Digio requests for the same agreement, and Digio rejected the second with
+// "Duplicate entity found". Calls for the same agreement now share one result.
+const esignInFlight = new Map();
+export function startEsign(userId, id, returnBase) {
+  const key = `${userId}:${id}`;
+  const running = esignInFlight.get(key);
+  if (running) return running;
+  const p = startEsignOnce(userId, id, returnBase).finally(() => esignInFlight.delete(key));
+  esignInFlight.set(key, p);
+  return p;
+}
+
+async function startEsignOnce(userId, id, returnBase) {
   const cfg = digioConfig();
   const agreement = await findOwnAgreement(userId, id, true);
   if (agreement.status === 'signed') throw httpError(409, 'This agreement is already signed');
