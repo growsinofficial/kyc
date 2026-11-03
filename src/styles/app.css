@@ -340,3 +340,45 @@ footer.foot-note { font-size: 12px; color: var(--muted); text-align: center; pad
 @media (max-width: 400px) { .logo-img { height: 38px } .brand b { font-size: 15.5px } .bar-in { gap: 9px } }
 @media (max-width: 350px) { .logo-img { height: 30px } .brand b { font-size: 13.5px } .bar-div { display: none } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important } }
+
+/* ---- Review order / coupons (same layout as the Growsin app) ---- */
+.pay { gap: 16px }
+.po-plan { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; background: var(--tint); border: 1px solid var(--tint-2) }
+.po-plan b { display: block; font-size: 15px; color: var(--ink) }
+.po-plan small { color: var(--muted); font-size: 12.5px }
+.po-price { text-align: right; white-space: nowrap }
+.po-price s { display: block; color: var(--muted); font-size: 12px }
+.po-price b { font-size: 19px; color: var(--brand) }
+.po-coupon { display: grid; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 14px }
+.po-ch { display: flex; justify-content: space-between; align-items: center }
+.po-ch span { font-size: 11px; font-weight: 800; letter-spacing: .07em; color: var(--muted); text-transform: uppercase }
+.po-input { display: flex; gap: 8px }
+.po-input input { flex: 1; min-width: 0; height: 44px; border: 1.5px solid var(--line-2); border-radius: 10px; padding: 0 12px; font: inherit; font-weight: 700; letter-spacing: .06em; color: var(--ink); background: #fff }
+.po-input input:focus { outline: none; border-color: var(--brand-2) }
+.po-input .btn { height: 44px; padding: 0 18px }
+.po-msg { margin: 0; color: var(--red); font-size: 12.5px; font-weight: 600 }
+.po-best { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--amber-bg); color: var(--amber-ink); font-size: 13px }
+.po-applied { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--tint); border: 1px dashed var(--brand-2) }
+.po-applied div { flex: 1 } .po-applied b { display: block; color: var(--brand); letter-spacing: .03em } .po-applied small { color: var(--muted) }
+.po-pct { width: 30px; height: 30px; border-radius: 50%; background: var(--brand-2); color: #fff; display: grid; place-items: center; font-weight: 900 }
+.link-btn.danger { color: var(--red) }
+.btn.sm { height: 34px; padding: 0 14px; font-size: 13px; border-radius: 8px }
+.sum-row.save b { color: var(--brand-2) }
+.po-total { display: grid; line-height: 1.2 }
+.po-total small { color: var(--muted); font-size: 11.5px } .po-total b { font-size: 19px; color: var(--ink) } .po-total em { font-style: normal; color: var(--brand-2); font-size: 12px; font-weight: 700 }
+.sheet-wrap { position: fixed; inset: 0; z-index: 60; background: rgba(20, 32, 25, .45); display: flex; align-items: flex-end; justify-content: center; animation: fade .15s ease }
+.sheet { width: min(560px, 100%); max-height: 82vh; overflow: auto; background: #fff; border-radius: 18px 18px 0 0; padding: 10px 18px calc(18px + env(safe-area-inset-bottom)); display: grid; gap: 12px; animation: slideup .22s ease }
+.sheet-grab { width: 40px; height: 4px; border-radius: 4px; background: var(--line-2); margin: 0 auto }
+.sheet-h { display: flex; justify-content: space-between; align-items: center } .sheet-h h2 { margin: 0; font-size: 17px; color: var(--ink) }
+.tickets { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px }
+.ticket { display: flex; align-items: center; gap: 12px; border: 1px solid var(--tint-2); border-radius: 12px; overflow: hidden; padding-right: 12px; background: #fff }
+.ticket.off { opacity: .6 }
+.t-left { align-self: stretch; writing-mode: vertical-rl; transform: rotate(180deg); background: var(--brand); color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .12em; padding: 10px 6px; text-align: center }
+.ticket.off .t-left { background: var(--muted) }
+.t-body { flex: 1; display: grid; gap: 2px; padding: 10px 0; font-size: 13px; color: var(--ink-2) }
+.t-code { font-size: 14.5px; letter-spacing: .06em; color: var(--brand) }
+.t-body small { color: var(--muted); font-size: 11.5px }
+@keyframes slideup { from { transform: translateY(40px); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+@media (min-width: 761px) { .sheet-wrap { align-items: center } .sheet { border-radius: 18px } }
+@media (max-width: 760px) { .sheet .actions { position: static; box-shadow: none; padding: 12px 0 0; background: none; backdrop-filter: none; -webkit-backdrop-filter: none } .sheet .actions .note { display: block } }

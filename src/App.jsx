@@ -9,7 +9,7 @@ import Auth, { ResetPassword } from './screens/Auth'
 import Details from './screens/Details'
 import Risk from './screens/Risk'
 import Review from './screens/Review'
-import Payment, { PaymentReturn, Done } from './screens/Payment'
+import Payment, { Done } from './screens/Payment'
 import EsignReturn from './screens/EsignReturn'
 
 // The signing screen carries the PDF viewer; load it only when needed.
@@ -32,8 +32,6 @@ function routeFromPath() {
   const p = window.location.pathname
   const reset = p.match(/^\/reset-password\/([^/]+)/)
   if (reset) return { name: 'reset', token: decodeURIComponent(reset[1]) }
-  if (p.startsWith('/payment/success')) return { name: 'paid' }
-  if (p.startsWith('/payment/cancel')) return { name: 'pay-cancel' }
   if (p.startsWith('/esign/complete')) return { name: 'esign-return' }
   return { name: 'app' }
 }
@@ -164,9 +162,7 @@ function Onboarding() {
   if (booting) content = <div className="boot">Loading…</div>
   else if (route.name === 'reset') content = <ResetPassword token={route.token} onDone={leaveRoute} />
   else if (!user) content = <Auth onSignedIn={async (u) => { setExplicit(false); await loadAll(u) }} />
-  else if (route.name === 'paid' || route.name === 'pay-cancel') {
-    content = <PaymentReturn cancelled={route.name === 'pay-cancel'} onDone={async () => { leaveRoute(); await reload() }} onRetry={() => { leaveRoute(); go('payment') }} />
-  } else if (route.name === 'esign-return') {
+  else if (route.name === 'esign-return') {
     content = <EsignReturn onSigned={async (a) => { leaveRoute(); setAgreement(a); await loadAll(user); go('sign') }} onRetry={() => { leaveRoute(); go('sign') }} />
   } else {
     switch (step) {
@@ -185,7 +181,7 @@ function Onboarding() {
           : <div className="boot">Generate your agreement first.</div>
         break
       case 'payment':
-        content = <Payment plan={plan} agreement={agreement} onBack={() => go('sign')} />
+        content = <Payment onBack={() => go('sign')} onPaid={async () => { setExplicit(false); await loadAll() }} />
         break
       default:
         content = <Done user={user} onDownload={downloadSigned} />

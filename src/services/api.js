@@ -99,8 +99,11 @@ class ApiService {
   esignReturn(digioDocId) { return this.request('/agreements/esign/return', { method: 'POST', body: { digio_doc_id: digioDocId } }) }
 
   // ---- Payment ----
-  initiatePayment(planId) { return this.request('/payments/initiate', { method: 'POST', body: { planId, paymentMethod: 'zoho' } }) }
-  verifyPayment(transactionId, paymentId) { return this.request('/payments/verify', { method: 'POST', body: { transactionId, paymentId } }) }
+  paymentSummary() { return this.request('/payments/summary') }
+  validateCoupon(code) { return this.request('/payments/coupons/validate', { method: 'POST', body: { code } }) }
+  createOrder(couponCode) { return this.request('/payments/order', { method: 'POST', body: { couponCode: couponCode || undefined } }) }
+  verifyPayment(orderId, paymentId, signature) { return this.request('/payments/verify', { method: 'POST', body: { orderId, paymentId, signature } }) }
+  cancelPayment(orderId) { return this.request('/payments/cancel', { method: 'POST', body: { orderId } }) }
 }
 
 export { ApiError }

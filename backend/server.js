@@ -68,12 +68,17 @@ app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 // Digio eSign webhooks: raw body for the optional checksum check
 app.use('/api/webhooks/digio', express.raw({ type: '*/*', limit: '2mb' }));
 
-// Digio signing happens on Digio's own page (a redirect), so nothing from Digio runs here.
+// Digio signing happens on Digio's own page (a redirect). Zoho Payments' checkout
+// widget runs on this page, so its script, frames and API calls are allowed.
+const ZOHO_PAY = ['https://static.zohocdn.com', 'https://*.zohocdn.com', 'https://*.zoho.in', 'https://*.zoho.com', 'https://*.zohostatic.com'];
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   contentSecurityPolicy: {
     directives: {
-      'img-src': ["'self'", 'data:', 'blob:'],
+      'script-src': ["'self'", ...ZOHO_PAY],
+      'frame-src': ["'self'", ...ZOHO_PAY],
+      'connect-src': ["'self'", ...ZOHO_PAY],
+      'img-src': ["'self'", 'data:', 'blob:', ...ZOHO_PAY],
       'worker-src': ["'self'", 'blob:'],
     },
   },

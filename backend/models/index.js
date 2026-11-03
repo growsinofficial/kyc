@@ -5,8 +5,14 @@ import Document from './Document.js';
 import Plan from './Plan.js';
 import Transaction from './Transaction.js';
 import Agreement from './Agreement.js';
+import Coupon from './Coupon.js';
+import CouponRedemption from './CouponRedemption.js';
+import PaymentOrder from './PaymentOrder.js';
 
 export {
+  Coupon,
+  CouponRedemption,
+  PaymentOrder,
   User,
   KYCData,
   RiskProfile,
