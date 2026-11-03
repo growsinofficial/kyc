@@ -1,403 +1,202 @@
-import * as React from 'react'
-import { useEffect, useRef, useState } from 'react'
-import { 
-  Box, 
-  Chip, 
-  Container, 
-  Paper, 
-  Stack, 
-  Tab, 
-  Tabs, 
-  Typography, 
-  Button, 
-  Checkbox, 
-  FormControlLabel,
-  Fade
-} from '@mui/material'
-import { ThemeProvider } from '@mui/material/styles'
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
-import { theme } from './theme/theme'
-import { clearCurrentSession, loadCurrentSession, loadUserProgress, saveCurrentSession, saveUserProgress } from './utils/storage'
-import { usePersist } from './hooks/usePersist'
-import { getInitialState } from './rootState.js' 
-import apiService from './services/api.js' 
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import api from './services/api'
+import Header from './components/Header'
+import ProgressRail from './components/ProgressRail'
+import { STEPS } from './constants/steps'
+import { ToastProvider } from './components/Toasts'
+import { useToast } from './components/toastContext'
+import Auth, { ResetPassword } from './screens/Auth'
+import Details from './screens/Details'
+import Risk from './screens/Risk'
+import Review from './screens/Review'
+import Payment, { PaymentReturn, Done } from './screens/Payment'
 
-// auth
-import Signup from './components/auth/Signup'
-import Login from './components/auth/Login'
+// The signing screen carries the PDF viewer; load it only when needed.
+const Sign = lazy(() => import('./screens/Sign'))
 
-// flows
-import KycContainer from './components/kyc/KycContainer'
-import Risk from './components/risk/Risk'
-import Docs from './components/docs/Docs'
-import Plans from './components/plan/Plans'
-import SignAgreement from './components/agreement/SignAgreement'
-import Payment from './components/payment/Payment'
+const RISK_VERSION = 'agreement-7q-v1'
+const PLAN_KEY = 'growsin.planId'
+const readPlan = () => { try { return localStorage.getItem(PLAN_KEY) || '' } catch { return '' } }
+const savePlan = (id) => { try { localStorage.setItem(PLAN_KEY, id) } catch { /* ignore */ } }
 
-// Assessment Component (moved outside)
-function Assessment({ state, navigateTo }) {
-  const [scrolled, setScrolled] = React.useState(false)
-  const [ack, setAck] = React.useState(false)
-  const scrollRef = useRef(null)
-
-  React.useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const noScrollNeeded = el.scrollHeight <= el.clientHeight + 1
-    if (noScrollNeeded) setScrolled(true)
-  }, [])
-
-  React.useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const handle = () => {
-      const noScrollNeeded = el.scrollHeight <= el.clientHeight + 1
-      if (noScrollNeeded) setScrolled(true)
-    }
-    window.addEventListener('resize', handle)
-    return () => window.removeEventListener('resize', handle)
-  }, [])
-
-  const handleScroll = (e) => {
-    const el = e.currentTarget
-    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20
-    if (atBottom) setScrolled(true)
-  }
-
-  const canProceed = scrolled && ack
-
+export default function App() {
   return (
-    <Container maxWidth="lg" sx={{ py: 5 }}>
-      {/* Header */}
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        alignItems={{ xs: 'flex-start', sm: 'center' }}
-        justifyContent="space-between"
-        spacing={2}
-        sx={{ mb: 4 }}
-      >
-        <Typography variant="h4" fontWeight={700} color="primary">
-          Suitability Assessment
-        </Typography>
-        <Stack direction="row" spacing={1}>
-          <Chip label="ASSESSMENT" color="primary" variant="filled" />
-        </Stack>
-      </Stack>
-
-      <Fade in timeout={800}>
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            borderRadius: 3, 
-            boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
-            border: '1px solid',
-            borderColor: 'grey.100',
-            overflow: 'hidden'
-          }}
-        >
-          {/* Header Section */}
-          <Box sx={{ 
-            p: 4, 
-            background: 'linear-gradient(135deg, #f5f7fa 0%, #e3e8f0 100%)',
-            borderBottom: '1px solid',
-            borderColor: 'grey.200'
-          }}>
-            <Typography variant="h5" fontWeight={600} gutterBottom>
-              Investment Suitability Assessment
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Hello, <strong>{state.userData.name || 'Guest'}</strong>! Please read the following document carefully before proceeding. 
-              This assessment helps ensure our recommendations align with your financial goals and risk tolerance.
-            </Typography>
-          </Box>
-
-          {/* Scrollable Content */}
-          <Box
-            ref={scrollRef}
-            sx={{
-              maxHeight: { xs: 400, sm: 500 },
-              overflow: 'auto',
-              p: 4,
-              bgcolor: 'grey.50',
-            }}
-            onScroll={handleScroll}
-          >
-            <Stack spacing={4}>
-              {[1, 2, 3, 4, 5].map((p) => (
-                <Box key={p} sx={{ 
-                  p: 3, 
-                  backgroundColor: 'white',
-                  borderRadius: 2,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                  border: '1px solid',
-                  borderColor: 'grey.200'
-                }}>
-                  <Typography variant="h6" fontWeight={700} color="primary" gutterBottom>
-                    Section {p}: Understanding Your Investment Profile
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary" paragraph>
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor 
-                    incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis 
-                    nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-                  </Typography>
-                  <Typography variant="body1" color="text.secondary" paragraph>
-                    Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore 
-                    eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt 
-                    in culpa qui officia deserunt mollit anim id est laborum.
-                  </Typography>
-                  <Box sx={{ 
-                    p: 2, 
-                    backgroundColor: 'primary.50',
-                    borderRadius: 1,
-                    border: '1px solid',
-                    borderColor: 'primary.100'
-                  }}>
-                    <Typography variant="body2" fontWeight={600} color="primary.main">
-                      Key Point: This section explains important aspects of investment suitability 
-                      and risk assessment that are crucial for making informed decisions.
-                    </Typography>
-                  </Box>
-                </Box>
-              ))}
-            </Stack>
-          </Box>
-
-          {/* Action Section */}
-          <Box sx={{ 
-            p: 3, 
-            backgroundColor: 'white',
-            borderTop: '1px solid',
-            borderColor: 'grey.200'
-          }}>
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              alignItems={{ xs: 'flex-start', sm: 'center' }}
-              justifyContent="space-between"
-              spacing={3}
-            >
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    disabled={!scrolled}
-                    checked={ack}
-                    onChange={(e) => setAck(e.target.checked)}
-                    sx={{ 
-                      '&.Mui-disabled': {
-                        color: 'grey.400'
-                      }
-                    }}
-                  />
-                }
-                label={
-                  <Typography variant="body1" color={scrolled ? 'text.primary' : 'text.disabled'}>
-                    I have read and understood the complete document
-                    {!scrolled && " (scroll to bottom to enable)"}
-                  </Typography>
-                }
-              />
-
-              <Button
-                variant="contained"
-                disabled={!canProceed}
-                onClick={() => navigateTo('docs')}
-                size="large"
-                sx={{
-                  minWidth: 140,
-                  height: 48,
-                  borderRadius: 2,
-                  fontSize: '1rem',
-                  fontWeight: 600,
-                  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-                  boxShadow: '0 4px 15px rgba(25, 118, 210, 0.3)',
-                  '&:hover': {
-                    boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)',
-                    transform: 'translateY(-1px)'
-                  },
-                  '&:disabled': {
-                    background: 'grey.300',
-                    transform: 'none',
-                    boxShadow: 'none'
-                  },
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                Continue
-              </Button>
-            </Stack>
-
-            {/* Progress Indicator */}
-            {!scrolled && (
-              <Box sx={{ mt: 2, textAlign: 'center' }}>
-                {/* <Typography variant="caption" color="text.secondary">
-                  📜 Scroll to the bottom to read the entire document
-                </Typography> */}
-              </Box>
-            )}
-          </Box>
-        </Paper>
-      </Fade>
-    </Container>
+    <ToastProvider>
+      <Onboarding />
+    </ToastProvider>
   )
 }
 
-export default function App() {
-  const [state, setState] = useState(getInitialState())
-  const persist = usePersist(setState)
-  const [authTab, setAuthTab] = useState(0) // 0 signup, 1 login
-  const parentOriginRef = useRef('*')
+function routeFromPath() {
+  const p = window.location.pathname
+  const reset = p.match(/^\/reset-password\/([^/]+)/)
+  if (reset) return { name: 'reset', token: decodeURIComponent(reset[1]) }
+  if (p.startsWith('/payment/success')) return { name: 'paid' }
+  if (p.startsWith('/payment/cancel')) return { name: 'pay-cancel' }
+  return { name: 'app' }
+}
 
-  // Cache parent origin for secure postMessage communication when embedded in Next.js
-  useEffect(() => {
-    if (window.parent !== window) {
-      try {
-        if (document.referrer) {
-          parentOriginRef.current = new URL(document.referrer).origin
-        }
-      } catch (error) {
-        console.warn('Unable to determine parent origin:', error)
-      }
+function Onboarding() {
+  const toast = useToast()
+  const [route, setRoute] = useState(routeFromPath)
+  const [booting, setBooting] = useState(true)
+  const [user, setUser] = useState(null)
+  const [kyc, setKyc] = useState(null)
+  const [risk, setRisk] = useState(null)
+  const [plans, setPlans] = useState([])
+  const [planId, setPlanId] = useState(readPlan)
+  const [agreement, setAgreement] = useState(null)
+  const [step, setStep] = useState('auth')
 
-      window.parent.postMessage({ type: 'KYC_LOADED' }, parentOriginRef.current)
-    }
+  const loadAll = useCallback(async (knownUser) => {
+    const me = knownUser || (await api.me()).user
+    const [k, r, p, a] = await Promise.allSettled([api.getKYC(), api.getRiskProfile(), api.getPlans(), api.currentAgreement()])
+    const kycData = k.status === 'fulfilled' ? k.value.data : null
+    const riskProfile = r.status === 'fulfilled' && r.value.riskProfile?.assessmentVersion === RISK_VERSION ? r.value.riskProfile : null
+    const planList = p.status === 'fulfilled' ? p.value.plans || [] : []
+    const agr = a.status === 'fulfilled' ? a.value.agreement : null
+    setUser(me); setKyc(kycData); setRisk(riskProfile); setPlans(planList); setAgreement(agr)
+    setPlanId((cur) => {
+      const ids = planList.map((x) => x._id)
+      const pick = (agr?.planId && ids.includes(String(agr.planId)) && String(agr.planId)) || (ids.includes(cur) && cur) || ids[0] || ''
+      if (pick) savePlan(pick)
+      return pick
+    })
+    return { me, kycData, riskProfile, agr }
   }, [])
 
-  // Handle OAuth callbacks
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search)
-    const oauthSuccess = urlParams.get('oauth') === 'success'
-    const oauthError = urlParams.get('oauth') === 'error'
-    const errorMessage = urlParams.get('error')
-
-    if (oauthSuccess) {
-      // Clear URL params and show success message
-      window.history.replaceState({}, document.title, window.location.pathname)
-      alert('Gmail OAuth connection successful! Email notifications are now enabled.')
-    } else if (oauthError) {
-      // Clear URL params and show error message
-      window.history.replaceState({}, document.title, window.location.pathname)
-      alert(`Gmail OAuth failed: ${errorMessage || 'Unknown error'}`)
+  const status = useMemo(() => {
+    const detailsDone = !!(kyc?.personal?.name && kyc?.address?.address && kyc?.professional?.occupation)
+    const riskDone = !!risk
+    const generated = !!agreement
+    const signed = agreement?.status === 'signed'
+    const paid = !!user?.flags?.paymentDone
+    const done = { details: detailsDone, risk: riskDone, review: generated, sign: signed, payment: paid }
+    const canOpen = {
+      details: !signed,
+      risk: detailsDone && !signed,
+      review: detailsDone && riskDone && !signed,
+      sign: generated,
+      payment: signed,
     }
-  }, [])
-
-  // resume session
-  useEffect(() => {
-    let hasTriedRestore = false; // Prevent multiple restore attempts
-    
-    const logged = loadCurrentSession()
-    const authToken = localStorage.getItem('authToken')
-    
-    if (logged && authToken) {
-      const userState = loadUserProgress(logged)
-      if (userState) {
-        setState({ ...userState, currentUser: logged })
-      }
-    } else if (authToken && !logged && !hasTriedRestore) {
-      hasTriedRestore = true;
-      // If we have a token but no session, try to get user info from API
-      const tryRestoreSession = async () => {
-        try {
-          const userInfo = await apiService.getCurrentUser()
-          if (userInfo && userInfo.user) {
-            const newState = {
-              ...getInitialState(),
-              currentUser: userInfo.user.email,
-              currentStep: userInfo.user.kycStatus === 'completed' ? 'plans' : 'kyc',
-              userData: {
-                name: userInfo.user.name,
-                email: userInfo.user.email,
-                mobile: userInfo.user.mobile,
-                userId: userInfo.user.id
-              },
-              emailVerified: userInfo.user.emailVerified,
-              mobileVerified: userInfo.user.mobileVerified,
-              kycCompleted: userInfo.user.kycStatus === 'completed',
-              riskProfileCompleted: userInfo.user.riskProfile?.completed || false
-            }
-            setState(newState)
-            saveCurrentSession(userInfo.user.email)
-            saveUserProgress(userInfo.user.email, newState)
-          }
-        } catch (error) {
-          console.log('Failed to restore session:', error)
-          // Clear invalid token
-          localStorage.removeItem('authToken')
-          localStorage.removeItem('currentUser')
-        }
-      }
-      
-      // Add a small delay to prevent rapid successive calls
-      setTimeout(tryRestoreSession, 100)
+    const sub = {
+      details: detailsDone ? 'All details complete' : 'Not started',
+      risk: riskDone ? `${risk.riskCategory} · ${risk.riskScore}/21` : 'Not started',
+      review: generated ? 'Agreement generated' : 'Not generated',
+      sign: signed ? 'Signed with Aadhaar' : generated ? 'Waiting for OTP' : 'After generating',
+      payment: paid ? 'Paid' : signed ? 'Fee due' : 'After signing',
     }
-  }, []) // Remove dependencies that could cause re-runs
+    return { done, canOpen, sub }
+  }, [kyc, risk, agreement, user])
 
-  // Broadcast step changes and completion events to parent shell
+  const nextStep = (s = status) => {
+    if (!s.done.details) return 'details'
+    if (!s.done.risk) return 'risk'
+    if (!s.done.review) return 'review'
+    if (!s.done.sign) return 'sign'
+    if (!s.done.payment) return 'payment'
+    return 'done'
+  }
+
+  // Restore the session on load
+  useEffect(() => {
+    if (route.name === 'reset') { setBooting(false); return }
+    if (!api.token) { setBooting(false); return }
+    loadAll().catch(() => api.setToken(null)).finally(() => setBooting(false))
+  }, [loadAll, route.name])
+
+  // Pick the right step whenever the data changes and no explicit step is set
+  const [explicit, setExplicit] = useState(false)
+  useEffect(() => {
+    if (!user) { setStep('auth'); return }
+    if (!explicit) setStep(nextStep())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, status])
+
+  // When embedded in the Growsin site (iframe), keep the parent informed (same messages as before).
   useEffect(() => {
     if (window.parent === window) return
+    let origin = '*'
+    try { if (document.referrer) origin = new URL(document.referrer).origin } catch { /* keep * */ }
+    window.parent.postMessage({ type: 'KYC_STEP_CHANGE', data: { step } }, origin)
+    if (user?.flags?.paymentDone) window.parent.postMessage({ type: 'KYC_COMPLETE', data: { user: user.email } }, origin)
+  }, [step, user])
+  useEffect(() => {
+    if (window.parent === window) return
+    let origin = '*'
+    try { if (document.referrer) origin = new URL(document.referrer).origin } catch { /* keep * */ }
+    window.parent.postMessage({ type: 'KYC_LOADED' }, origin)
+  }, [])
 
-    window.parent.postMessage(
-      { type: 'KYC_STEP_CHANGE', data: { step: state.currentStep } },
-      parentOriginRef.current
-    )
+  const go = (s) => { setExplicit(true); setStep(s); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  const reload = async () => { setExplicit(false); await loadAll(user) }
 
-    if (state.flags?.paymentDone) {
-      window.parent.postMessage(
-        { type: 'KYC_COMPLETE', data: { user: state.currentUser } },
-        parentOriginRef.current
-      )
-    }
-  }, [state.currentStep, state.flags?.paymentDone, state.currentUser])
+  const progress = STEPS.reduce((t, s) => t + (status.done[s.id] ? 100 / STEPS.length : 0), 0)
+  const plan = plans.find((p) => p._id === planId)
+  const client = kyc?.personal?.name ? { name: kyc.personal.name, meta: [kyc.personal.pan, risk?.riskCategory, plan?.title].filter(Boolean).join(' · ') } : null
+  const order = ['details', 'risk', 'review', 'sign', 'payment']
+  const prev = order[order.indexOf(step) - 1]
+  const onBack = user && prev && status.canOpen[prev] ? () => go(prev) : undefined
 
-  const navigateTo = (next) => persist(s => ({ ...s, currentStep: next }))
-  const logout = () => { clearCurrentSession(); setState(getInitialState()) }
+  const logout = async () => {
+    await api.logout()
+    setUser(null); setKyc(null); setRisk(null); setAgreement(null); setExplicit(false)
+    toast('Logged out')
+  }
 
-  const Auth = () => (
-    <Container maxWidth="lg" sx={{ py: 2 }}>
-<Stack 
-  direction="row" 
-  alignItems="center" 
-  justifyContent="space-between" 
-  sx={{ 
-    mb: 1,
-    p: 1.5,
-    backgroundColor: 'white',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-    borderRadius: 1.3,
-    border: '1px solid',
-    borderColor: 'grey.100'
-  }}
->
-  <Typography variant="h5" fontWeight={800}>Digital Onboarding</Typography>
-  <Tabs value={authTab} onChange={(_,v)=>setAuthTab(v)} aria-label="auth tabs">
-    <Tab label="Sign Up"/>
-    <Tab label="Login"/>
-  </Tabs>
-</Stack>
-      {authTab===0? <Signup state={state} persist={persist} setState={setState}/> : <Login setState={setState}/>}
-    </Container>
-  )
+  const downloadSigned = async () => {
+    if (!agreement) return
+    try {
+      const bytes = await api.agreementPdf(agreement.id)
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+      const a = document.createElement('a')
+      a.href = url; a.download = agreement.fileName.replace(/\.pdf$/, '_signed.pdf')
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 5000)
+    } catch (e) { toast(e.message, 'warn') }
+  }
 
-  const Screen = () => {
-    switch (state.currentStep) {
-      case 'auth': return <Auth/>
-      case 'kyc': return <KycContainer state={state} persist={persist} onLogout={logout} navigateTo={navigateTo}/>
-      case 'risk': return <Risk state={state} persist={persist} onLogout={logout} navigateTo={navigateTo}/>
-      case 'assessment': return <Assessment state={state} navigateTo={navigateTo} onLogout={logout}/>
-      case 'docs': return <Docs state={state} persist={persist} onLogout={logout} navigateTo={navigateTo}/>
-      case 'plan': return <Plans state={state} persist={persist} onLogout={logout} navigateTo={navigateTo}/>
-      case 'sign': return <SignAgreement state={state} onLogout={logout} navigateTo={navigateTo}/>
-      case 'payment': return <Payment state={state} onLogout={logout}/>
-      default: return <Auth/>
+  const leaveRoute = () => { window.history.replaceState({}, '', '/'); setRoute({ name: 'app' }) }
+
+  let content
+  if (booting) content = <div className="boot">Loading…</div>
+  else if (route.name === 'reset') content = <ResetPassword token={route.token} onDone={leaveRoute} />
+  else if (!user) content = <Auth onSignedIn={async (u) => { setExplicit(false); await loadAll(u) }} />
+  else if (route.name === 'paid' || route.name === 'pay-cancel') {
+    content = <PaymentReturn cancelled={route.name === 'pay-cancel'} onDone={async () => { leaveRoute(); await reload() }} onRetry={() => { leaveRoute(); go('payment') }} />
+  } else {
+    switch (step) {
+      case 'details':
+        content = <Details user={user} kyc={kyc} plans={plans} planId={planId} onPlan={(id) => { setPlanId(id); savePlan(id) }} riskCategory={risk?.riskCategory} onSaved={async () => { await loadAll(user); go(status.done.risk ? 'review' : 'risk') }} />
+        break
+      case 'risk':
+        content = <Risk initialAnswers={risk?.answers} onBack={() => go('details')} onSaved={async () => { await loadAll(user); go('review') }} />
+        break
+      case 'review':
+        content = <Review kyc={kyc} risk={risk} plan={plan} onEdit={go} onGenerated={(a) => { setAgreement(a); go('sign') }} />
+        break
+      case 'sign':
+        content = agreement
+          ? <Suspense fallback={<div className="boot">Loading…</div>}><Sign key={agreement.id} agreement={agreement} onBack={() => go('details')} onSigned={async (a, next) => { setAgreement(a); if (next) { await reload(); go('payment') } }} /></Suspense>
+          : <div className="boot">Generate your agreement first.</div>
+        break
+      case 'payment':
+        content = <Payment plan={plan} agreement={agreement} onBack={() => go('sign')} />
+        break
+      default:
+        content = <Done user={user} onDownload={downloadSigned} />
     }
   }
 
+  const showRail = user && !booting && route.name === 'app' && step !== 'done'
   return (
-    <ThemeProvider theme={theme}>
-      <LocalizationProvider dateAdapter={AdapterDateFns}>
-        <Box sx={{ minHeight: '100dvh', bgcolor: '#f5f7fb' }}>
-          <Screen/>
-        </Box>
-      </LocalizationProvider>
-    </ThemeProvider>
+    <>
+      <Header progress={user ? progress : 0} onBack={route.name === 'app' ? onBack : undefined} user={user} onLogout={logout} />
+      <main className={`shell${showRail ? '' : ' solo'}`}>
+        {showRail && <ProgressRail step={step} status={status} onGo={go} client={client} progress={progress} />}
+        <div className="work">{content}</div>
+      </main>
+      <footer className="foot-note">Growsin · Murali Krishna Sivvala, SEBI Registered Investment Adviser INA000021261 · Investments in securities markets are subject to market risks.</footer>
+    </>
   )
 }

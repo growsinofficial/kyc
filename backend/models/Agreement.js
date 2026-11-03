@@ -43,6 +43,7 @@ const agreementSchema = new mongoose.Schema(
 agreementSchema.methods.toClient = function () {
   return {
     id: this._id,
+    planId: this.planId,
     status: this.status,
     fileName: this.fileName,
     pageCount: this.pageCount,

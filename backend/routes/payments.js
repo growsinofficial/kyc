@@ -8,6 +8,7 @@ import User from '../models/User.js';
 import { kycZohoIntegration } from '../services/kycZohoIntegration.js';
 import { zohoBooksService } from '../utils/zohoBooks.js';
 import rateLimit from 'express-rate-limit';
+import { generateTransactionId } from '../utils/helpers.js';
 // Note: Convert to ES6 imports when ready
 // import zohoPayments from '../utils/zohoPayments.js';
 // import zohoIntegration from '../services/kycZohoIntegration.js';
@@ -45,8 +46,23 @@ const ZOHO_PAYMENT_CONFIG = {
 // @access  Private
 router.post('/initiate', protect, paymentUserLimiter, async (req, res, next) => {
   try {
-    const { planId, paymentMethod = 'zoho' } = req.body;
+    const { planId } = req.body;
     const userId = req.user._id;
+
+    // SEBI IA Regulations: no fee before the advisory agreement is signed (agreement clause 1.6.2).
+    if (!req.user.flags?.agreementSigned) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please sign your Investment Advisory Agreement before paying the fee'
+      });
+    }
+
+    if (!ZOHO_PAYMENT_CONFIG.apiKey || !ZOHO_PAYMENT_CONFIG.organizationId) {
+      return res.status(503).json({
+        success: false,
+        error: 'Online payment is not available right now. Please try again later.'
+      });
+    }
 
     // Validate plan exists
     const plan = await Plan.findById(planId);
@@ -59,11 +75,12 @@ router.post('/initiate', protect, paymentUserLimiter, async (req, res, next) => 
 
     // Create transaction record
     const transaction = new Transaction({
+      transactionId: generateTransactionId(),
       userId,
       planId,
       amount: plan.price,
       currency: 'INR',
-      paymentMethod,
+      // paymentMethod (upi/card/…) is only known after the gateway reports it
       paymentGateway: 'zoho',
       status: 'pending'
     });
@@ -87,8 +104,8 @@ router.post('/initiate', protect, paymentUserLimiter, async (req, res, next) => 
         price: plan.price
       }],
       currency_code: 'INR',
-      redirect_url: `${process.env.FRONTEND_URL}/payment/success`,
-      cancel_url: `${process.env.FRONTEND_URL}/payment/cancel`,
+      redirect_url: `${process.env.FRONTEND_URL}/payment/success?transaction_id=${transaction._id}`,
+      cancel_url: `${process.env.FRONTEND_URL}/payment/cancel?transaction_id=${transaction._id}`,
       webhook_url: `${process.env.BACKEND_URL}/api/payments/webhook`,
       reference_id: transaction._id.toString(),
       payment_options: {
@@ -147,7 +164,7 @@ router.post('/verify', protect, paymentUserLimiter, async (req, res, next) => {
 
     // Find transaction
     const transaction = await Transaction.findById(transactionId);
-    if (!transaction) {
+    if (!transaction || String(transaction.userId) !== String(req.user._id)) {
       return res.status(404).json({
         success: false,
         error: 'Transaction not found'
@@ -180,14 +197,14 @@ router.post('/verify', protect, paymentUserLimiter, async (req, res, next) => {
       transaction.status = 'completed';
       transaction.gatewayPaymentId = paymentId || transaction.gatewayPaymentId;
       transaction.gatewayTransactionId = transaction.gatewayTransactionId || verificationResponse.data.hostedpage?.payment_id;
-      transaction.paymentMethod = transaction.paymentMethod || 'online';
       transaction.completedAt = new Date();
       
       // Update user's subscription/plan status
       await User.findByIdAndUpdate(transaction.userId, {
         currentPlan: transaction.planId,
         planPurchasedAt: new Date(),
-        subscriptionStatus: 'active'
+        subscriptionStatus: 'active',
+        'flags.paymentDone': true
       });
 
       await transaction.save();
@@ -348,7 +365,8 @@ async function handlePaymentSuccess(data) {
       await User.findByIdAndUpdate(transaction.userId, {
         currentPlan: transaction.planId,
         planPurchasedAt: new Date(),
-        subscriptionStatus: 'active'
+        subscriptionStatus: 'active',
+        'flags.paymentDone': true
       });
 
       console.log('Payment success handled for transaction:', transaction._id);

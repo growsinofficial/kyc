@@ -1,5 +1,0 @@
-export const isEmail = (v) => /[^\s@]+@[^\s@]+\.[^\s@]+/.test(v || '')
-export const isPhone = (v) => /^\d{10}$/.test(v || '')
-export const isPan = (v) => /^[A-Z]{5}[0-9]{4}[A-Z]$/.test((v || '').toUpperCase())
-export const isAadhaar = (v) => /^\d{12}$/.test(v || '')
-export const isPincode = (v) => /^\d{6}$/.test(v || '')
