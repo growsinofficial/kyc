@@ -18,7 +18,7 @@ export const templatePath = () =>
 
 let templateCache = null;
 export const resetTemplateCache = () => { templateCache = null; };
-async function loadTemplate() {
+export async function loadTemplate() {
   if (templateCache) return templateCache;
   const p = templatePath();
   if (!fs.existsSync(p)) {

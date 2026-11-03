@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import express from 'express';
 import mongoose from 'mongoose';
 import { PDFDocument } from 'pdf-lib';
-import { resetTemplateCache } from '../services/agreementPdf.js';
+import { resetTemplateCache, loadTemplate } from '../services/agreementPdf.js';
 import Coupon from '../models/Coupon.js';
 import { normalizeCode } from '../services/coupons.js';
 import { deleteUserByMobile } from '../services/userCleanup.js';
@@ -32,6 +32,15 @@ router.put('/agreement-template', express.raw({ type: 'application/pdf', limit: 
     );
     resetTemplateCache();
     res.json({ success: true, pages, size: req.body.length });
+  } catch (e) { next(e); }
+});
+
+// Download the stored template (to check layout and signature positions).
+router.get('/agreement-template', async (req, res, next) => {
+  try {
+    if (!tokenOk(req.get('x-setup-token'))) return res.status(404).json({ success: false, message: 'Not found' });
+    const pdf = await loadTemplate();
+    res.set({ 'Content-Type': 'application/pdf', 'Cache-Control': 'no-store' }).send(pdf);
   } catch (e) { next(e); }
 });
 
