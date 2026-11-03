@@ -17,6 +17,7 @@ export const templatePath = () =>
   process.env.AGREEMENT_TEMPLATE_PATH || path.join(__dirname, '..', 'private', 'agreement-template.pdf');
 
 let templateCache = null;
+export const resetTemplateCache = () => { templateCache = null; };
 async function loadTemplate() {
   if (templateCache) return templateCache;
   const p = templatePath();

@@ -6,6 +6,10 @@ import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
+import mongoose from 'mongoose';
+import setupRoutes from './routes/setup.js';
+import { Plan } from './models/index.js';
+import { PLANS } from './config/plans.js';
 import { fileURLToPath } from 'url';
 
 // Database connection
@@ -40,6 +44,18 @@ const app = express();
 
 // Connect to MongoDB
 connectDB();
+
+// Hosted test setups: load the advisory plans on first start when none exist.
+if (process.env.SEED_PLANS_IF_EMPTY === 'true') {
+  mongoose.connection.once('open', async () => {
+    try {
+      if (!(await Plan.countDocuments())) {
+        await Plan.insertMany(PLANS);
+        console.log(`Seeded ${PLANS.length} plans`);
+      }
+    } catch (e) { console.error('Plan seeding failed:', e.message); }
+  });
+}
 
 // Security Middleware
 // Trust proxy for correct IP and secure cookies when behind proxies
@@ -144,6 +160,7 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/zoho', zohoBooksRoutes);
 app.use('/api/agreements', agreementsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/setup', setupRoutes);
 
 // OAuth Setup Routes (for Zoho Payments OAuth configuration)
 import oauthSetupRoutes from './routes/oauthSetup.js';
