@@ -4,6 +4,10 @@ import nodemailer from 'nodemailer';
 const createTransporter = () => {
   return nodemailer.createTransport({
     service: 'gmail',
+    // Never let a slow mail server block sign-up or OTP requests.
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
     auth: {
       user: process.env.EMAIL_USERNAME,
       pass: process.env.GMAIL_APP_PASSWORD, // Use App Password instead of OAuth2
@@ -13,6 +17,10 @@ const createTransporter = () => {
 
 // Send email function
 const sendEmail = async (options) => {
+  if (!process.env.EMAIL_USERNAME || !process.env.GMAIL_APP_PASSWORD) {
+    console.warn(`Email not configured; skipped "${options.subject}" to ${options.to}`);
+    return { skipped: true };
+  }
   try {
     const transporter = createTransporter();
 

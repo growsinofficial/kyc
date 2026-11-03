@@ -1,117 +1,82 @@
 import express from 'express';
-import PDFDocument from 'pdfkit';
+import rateLimit from 'express-rate-limit';
 import { protect } from '../middleware/auth.js';
-import { User } from '../models/index.js';
-import KYCData from '../models/KYCData.js';
-import Document from '../models/Document.js';
+import { Agreement } from '../models/index.js';
+import { generateAgreement, findOwnAgreement, startEsign, syncEsign } from '../services/agreementService.js';
 
 const router = express.Router();
 
-// Generate a consolidated KYC PDF with signature and store as Document('agreement')
-// POST /api/agreements/generate
-router.post('/generate', protect, async (req, res, next) => {
+const generateLimiter = rateLimit({ windowMs: 10 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+
+// @desc    Fill the agreement template with the client's details
+// @route   POST /api/agreements/generate   body: { planId }
+// @access  Private
+router.post('/generate', protect, generateLimiter, async (req, res, next) => {
   try {
-    const userId = req.user._id;
+    const agreement = await generateAgreement(req.user._id, req.body.planId);
+    res.status(201).json({ success: true, agreement: agreement.toClient() });
+  } catch (error) {
+    next(error);
+  }
+});
 
-    const [user, kyc] = await Promise.all([
-      User.findById(userId),
-      KYCData.findOne({ userId })
-    ]);
+// @desc    Latest agreement for the signed-in client
+// @route   GET /api/agreements/current
+// @access  Private
+router.get('/current', protect, async (req, res, next) => {
+  try {
+    const agreement = await Agreement.findOne({ userId: req.user._id, status: { $ne: 'superseded' } }).sort({ createdAt: -1 });
+    res.status(200).json({ success: true, agreement: agreement ? agreement.toClient() : null });
+  } catch (error) {
+    next(error);
+  }
+});
 
-    if (!user || !kyc) {
-      return res.status(400).json({ success: false, error: 'User or KYC data not found' });
-    }
-
-    // Fetch signature image if uploaded
-    const signatureDoc = await Document.findOne({ userId, documentType: 'signature', isActive: true }).sort({ version: -1 });
-
-    // Build PDF in-memory
-    const doc = new PDFDocument({ size: 'A4', margin: 50 });
-    const chunks = [];
-    doc.on('data', (chunk) => chunks.push(chunk));
-
-    doc.fontSize(20).text('Growsin - KYC Summary & Agreement', { align: 'center' });
-    doc.moveDown();
-
-    doc.fontSize(12).text(`Name: ${user.name}`);
-    doc.text(`Email: ${user.email}`);
-    doc.text(`Mobile: ${user.mobile}`);
-    doc.text(`KYC Status: ${user.kycStatus || 'in_progress'}`);
-    doc.moveDown();
-
-    doc.fontSize(14).text('Personal Details', { underline: true });
-    doc.fontSize(12);
-    doc.text(`Full Name: ${kyc.personal?.name || ''}`);
-    doc.text(`PAN: ${kyc.personal?.pan || ''}`);
-    doc.text(`Aadhaar: ${kyc.personal?.aadhar || ''}`);
-    doc.text(`DOB: ${kyc.personal?.dob ? new Date(kyc.personal.dob).toISOString().split('T')[0] : ''}`);
-    doc.text(`Gender: ${kyc.personal?.gender || ''}`);
-    doc.text(`Marital Status: ${kyc.personal?.maritalStatus || ''}`);
-    doc.moveDown();
-
-    doc.fontSize(14).text('Address', { underline: true });
-    doc.fontSize(12);
-    doc.text(`Address: ${kyc.address?.address || ''}`);
-    doc.text(`City: ${kyc.address?.city || ''}`);
-    doc.text(`State: ${kyc.address?.state || ''}`);
-    doc.text(`Pincode: ${kyc.address?.pincode || ''}`);
-    doc.moveDown();
-
-    doc.fontSize(14).text('Professional', { underline: true });
-    doc.fontSize(12);
-    doc.text(`Occupation: ${kyc.professional?.occupation || ''}`);
-    doc.text(`Industry: ${kyc.professional?.industry || ''}`);
-    doc.text(`Experience: ${kyc.professional?.experience || ''}`);
-    doc.text(`Income Range: ${kyc.professional?.income || ''}`);
-    doc.moveDown();
-
-    doc.fontSize(12).text('By signing this document, I confirm that the above information is true and complete to the best of my knowledge.');
-    doc.moveDown(2);
-
-    // Signature block
-    doc.text('Signature:', { continued: true });
-    if (signatureDoc && signatureDoc.fileData && ['image/png','image/jpeg','image/jpg'].includes(signatureDoc.mimeType)) {
-      try {
-        // Place signature image
-        const img = Buffer.from(signatureDoc.fileData);
-        doc.image(img, { fit: [150, 60], align: 'left' });
-      } catch (_) {
-        // ignore image errors, still generate pdf
-      }
-    } else {
-      doc.text(' ___________________________');
-    }
-    doc.moveDown();
-    doc.text(`Date: ${new Date().toISOString().split('T')[0]}`);
-
-    doc.end();
-
-    // After PDF completed, save to Mongo
-    doc.on('end', async () => {
-      const buffer = Buffer.concat(chunks);
-
-      const saved = await Document.create({
-        userId,
-        documentType: 'agreement',
-        documentName: 'KYC Summary & Agreement',
-        originalName: `kyc-agreement-${userId}.pdf`,
-        fileName: `kyc-agreement-${Date.now()}.pdf`,
-        fileSize: buffer.length,
-        mimeType: 'application/pdf',
-        checksum: null,
-        fileData: buffer,
-        uploadSource: 'web'
-      });
-
-      const baseUrl = process.env.BACKEND_URL ? process.env.BACKEND_URL.replace(/\/$/, '') : `${req.protocol}://${req.get('host')}`;
-      return res.status(201).json({
-        success: true,
-        data: {
-          id: saved._id,
-          fileUrl: `${baseUrl}/api/documents/${saved._id}/download`
-        }
-      });
+// @desc    The agreement PDF (signed copy when available, or ?version=unsigned)
+// @route   GET /api/agreements/:id/pdf
+// @access  Private (owner only)
+router.get('/:id/pdf', protect, async (req, res, next) => {
+  try {
+    const agreement = await findOwnAgreement(req.user._id, req.params.id, true);
+    const wantUnsigned = req.query.version === 'unsigned';
+    const pdf = !wantUnsigned && agreement.signedPdf ? agreement.signedPdf : agreement.unsignedPdf;
+    const name = agreement.signedPdf && !wantUnsigned ? agreement.fileName.replace(/\.pdf$/, '_signed.pdf') : agreement.fileName;
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Length': pdf.length,
+      'Content-Disposition': `${req.query.download ? 'attachment' : 'inline'}; filename="${name}"`,
+      'Cache-Control': 'private, no-store',
     });
+    res.send(pdf);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @desc    Start Aadhaar eSign with Digio (returns what the Digio Web SDK needs)
+// @route   POST /api/agreements/:id/esign
+// @access  Private
+router.post('/:id/esign', protect, async (req, res, next) => {
+  try {
+    const esign = await startEsign(req.user._id, req.params.id);
+    res.status(200).json({ success: true, esign });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @desc    Called after the Digio window closes: confirm with Digio and store the signed PDF
+// @route   POST /api/agreements/:id/esign/complete
+// @access  Private
+router.post('/:id/esign/complete', protect, async (req, res, next) => {
+  try {
+    const agreement = await findOwnAgreement(req.user._id, req.params.id, true);
+    if (req.body?.txn_id && agreement.esign) {
+      agreement.esign.txnId = String(req.body.txn_id).slice(0, 100);
+      agreement.markModified('esign');
+    }
+    const synced = await syncEsign(agreement);
+    res.status(200).json({ success: true, agreement: synced.toClient() });
   } catch (error) {
     next(error);
   }

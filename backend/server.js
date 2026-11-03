@@ -48,6 +48,8 @@ app.disable('x-powered-by');
 
 // Use raw body for Zoho payment webhooks BEFORE JSON parsing to verify HMAC on exact payload
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+// Digio eSign webhooks: raw body for the optional checksum check
+app.use('/api/webhooks/digio', express.raw({ type: '*/*', limit: '2mb' }));
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }

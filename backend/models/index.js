@@ -4,6 +4,7 @@ import RiskProfile from './RiskProfile.js';
 import Document from './Document.js';
 import Plan from './Plan.js';
 import Transaction from './Transaction.js';
+import Agreement from './Agreement.js';
 
 export {
   User,
@@ -11,5 +12,6 @@ export {
   RiskProfile,
   Document,
   Plan,
-  Transaction
+  Transaction,
+  Agreement
 };
