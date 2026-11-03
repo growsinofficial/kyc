@@ -295,7 +295,9 @@ footer.foot-note { font-size: 12px; color: var(--muted); text-align: center; pad
   .hb-back { display: grid }
   .bar-user { display: none }
   .progress { height: 4px }
-  .shell { padding: 0 0 calc(96px + env(safe-area-inset-bottom)); gap: 0 }
+  .shell { padding: 0 0 8px; gap: 0 }
+  /* The disclaimer sits above the fixed Continue bar, not underneath it. */
+  footer.foot-note { padding: 18px 20px calc(104px + env(safe-area-inset-bottom)); line-height: 1.5 }
   .shell.solo { padding-inline: 0 }
   .rail { display: none }
   .card.panel { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 18px 16px 0; gap: 14px; grid-template-columns: minmax(0, 1fr) }
