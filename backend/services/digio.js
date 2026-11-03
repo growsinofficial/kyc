@@ -99,7 +99,10 @@ export function signUrl({ documentId, identifier, accessToken, returnBase }) {
   if (cfg.mode === 'mock') return null;
   const txn = crypto.randomBytes(4).toString('hex');
   const back = encodeURIComponent(`${String(returnBase).replace(/\/$/, '')}${ESIGN_RETURN_PATH}`);
-  const params = [...(accessToken ? [`token_id=${accessToken}`] : []), `redirect_url=${back}`, `error_url=${back}`];
+  // link_approach=true: Digio's own "sign link" layout (the one used for links Digio sends
+  // by SMS/email), which is laid out for phones: document details in a sheet, a bottom
+  // action bar. Without it the gateway uses its embedded/desktop-style document view.
+  const params = [...(accessToken ? [`token_id=${accessToken}`] : []), `redirect_url=${back}`, `error_url=${back}`, 'link_approach=true'];
   return `${cfg.app}/#/gateway/login/${documentId}/${txn}/${identifier}?${params.join('&')}`;
 }
 
