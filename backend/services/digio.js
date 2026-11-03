@@ -58,6 +58,11 @@ function digioError(e, what) {
  * Create an Aadhaar eSign request for the filled agreement.
  * Returns { documentId, accessToken, raw }.
  */
+export const SIGN_REASON = 'Investment Advisory Agreement';
+
+/** Fingerprint of what a Digio request bakes in (signature boxes, reason, link mode). */
+export const signRequestLayout = () => JSON.stringify({ coords: digioSignCoordinates(), reason: SIGN_REASON, link: 'link_approach' });
+
 export async function createSignRequest({ pdf, fileName, signer, reference }) {
   const cfg = digioConfig();
   if (cfg.mode === 'mock') {
@@ -67,7 +72,7 @@ export async function createSignRequest({ pdf, fileName, signer, reference }) {
   const body = {
     file_name: fileName,
     file_data: Buffer.from(pdf).toString('base64'),
-    signers: [{ identifier: signer.identifier, name: signer.name, reason: 'Investment Advisory Agreement', sign_type: 'aadhaar' }],
+    signers: [{ identifier: signer.identifier, name: signer.name, reason: SIGN_REASON, sign_type: 'aadhaar' }],
     expire_in_days: 10,
     display_on_page: 'custom',
     sign_coordinates: { [signer.identifier]: coords },

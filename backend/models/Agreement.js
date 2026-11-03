@@ -31,6 +31,7 @@ const agreementSchema = new mongoose.Schema(
       status: { type: String },
       txnId: { type: String },
       requestedAt: { type: Date },
+      layout: { type: String }, // signature boxes + reason this Digio request was made with
       signedAt: { type: Date },
       signerDetails: { type: Object }, // Digio pki_signature_details (name, aadhaar suffix, …)
       lastError: { type: String },

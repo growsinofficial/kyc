@@ -1,6 +1,6 @@
 import { User, KYCData, RiskProfile, Plan, Agreement } from '../models/index.js';
 import { buildAgreementValues, renderAgreementPdf } from './agreementPdf.js';
-import { digioConfig, createSignRequest, getDocument, downloadSignedPdf, isCompleted, isFailed, signUrl } from './digio.js';
+import { digioConfig, signRequestLayout, createSignRequest, getDocument, downloadSignedPdf, isCompleted, isFailed, signUrl } from './digio.js';
 import { CONTENT_PAGES } from '../config/agreementLayout.js';
 
 const httpError = (status, message) => Object.assign(new Error(message), { statusCode: status });
@@ -91,13 +91,16 @@ async function startEsignOnce(userId, id, returnBase) {
     if (settled.status === 'signed') throw httpError(409, 'This agreement is already signed');
   }
   const stale = provider === 'digio' && (!agreement.esign?.requestedAt || Date.now() - new Date(agreement.esign.requestedAt).getTime() > ACCESS_TOKEN_MAX_AGE_MS);
-  if (agreement.status !== 'sent_for_esign' || !agreement.esign?.documentId || agreement.esign.provider !== provider || stale) {
+  // A request made before the signature boxes/reason changed is replaced, so the client
+  // always signs with the current placement (Digio fixes it when the request is created).
+  const outdated = provider === 'digio' && agreement.esign?.layout !== signRequestLayout();
+  if (agreement.status !== 'sent_for_esign' || !agreement.esign?.documentId || agreement.esign.provider !== provider || stale || outdated) {
     const identifier = signerIdentifier(user, agreement, cfg.identifierType);
     const { documentId, accessToken } = await createSignRequest({
       pdf: agreement.unsignedPdf,
       fileName: agreement.fileName,
       signer: { identifier, name: agreement.values.Client_Name },
-      reference: String(agreement._id),
+      reference: `${agreement._id}-${Date.now()}`, // unique per request: a replacement must not look like a duplicate to Digio
     });
     agreement.status = 'sent_for_esign';
     agreement.esign = {
@@ -107,6 +110,7 @@ async function startEsignOnce(userId, id, returnBase) {
       identifier,
       status: 'requested',
       requestedAt: new Date(),
+      layout: signRequestLayout(),
       accessToken,
     };
     agreement.markModified('esign');
