@@ -5,6 +5,9 @@ import express from 'express';
 import mongoose from 'mongoose';
 import { PDFDocument } from 'pdf-lib';
 import { resetTemplateCache } from '../services/agreementPdf.js';
+import Coupon from '../models/Coupon.js';
+import { normalizeCode } from '../services/coupons.js';
+import { deleteUserByMobile } from '../services/userCleanup.js';
 
 const router = express.Router();
 
@@ -29,6 +32,35 @@ router.put('/agreement-template', express.raw({ type: 'application/pdf', limit: 
     );
     resetTemplateCache();
     res.json({ success: true, pages, size: req.body.length });
+  } catch (e) { next(e); }
+});
+
+// Create or update a coupon. Amounts in rupees, as in scripts/coupon.js.
+// body: { code, type: 'percent'|'flat', value, maxDiscount?, minOrder?, uses?, perUser?, expires? (YYYY-MM-DD), plans?: [codes], description?, hidden?, active? }
+router.put('/coupon', express.json(), async (req, res, next) => {
+  try {
+    if (!tokenOk(req.get('x-setup-token'))) return res.status(404).json({ success: false, message: 'Not found' });
+    const b = req.body || {};
+    const paise = (r) => (r === undefined || r === null ? null : Math.round(Number(r) * 100));
+    if (!b.code || !['percent', 'flat'].includes(b.type) || !(Number(b.value) >= 0)) return res.status(400).json({ success: false, message: 'code, type (percent|flat) and value are required' });
+    const doc = {
+      code: normalizeCode(b.code), discountType: b.type, value: b.type === 'flat' ? paise(b.value) : Number(b.value),
+      maxDiscountPaise: paise(b.maxDiscount), minOrderPaise: paise(b.minOrder) ?? 0,
+      maxRedemptions: b.uses ? Number(b.uses) : null, perUserLimit: Number(b.perUser ?? 1),
+      expiresAt: b.expires ? new Date(`${b.expires}T23:59:59+05:30`) : null,
+      appliesToPlans: Array.isArray(b.plans) ? b.plans : [], description: String(b.description || ''),
+      isPublic: !b.hidden, isActive: b.active !== false,
+    };
+    const coupon = await Coupon.findOneAndUpdate({ code: doc.code }, doc, { upsert: true, new: true, runValidators: true });
+    res.json({ success: true, coupon });
+  } catch (e) { next(e); }
+});
+
+// Remove a client and all their data by mobile number. Dry run unless { confirm: true }.
+router.post('/delete-user', express.json(), async (req, res, next) => {
+  try {
+    if (!tokenOk(req.get('x-setup-token'))) return res.status(404).json({ success: false, message: 'Not found' });
+    res.json({ success: true, ...(await deleteUserByMobile(req.body?.mobile, { dryRun: req.body?.confirm !== true })) });
   } catch (e) { next(e); }
 });
 
