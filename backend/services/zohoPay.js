@@ -106,7 +106,7 @@ export function verifyWebhookSignature(rawBody, header) {
 }
 
 export function extractSessionId(event) {
-  const data = event?.data ?? event?.payload ?? event ?? {};
+  const data = event?.event_object ?? event?.data ?? event?.payload ?? event ?? {};
   const ps = data.payments_session ?? data.payment_session ?? {};
   const p = data.payment ?? {};
   return [event?.payments_session_id, event?.payment_session_id, data.payments_session_id, data.payment_session_id,

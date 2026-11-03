@@ -105,7 +105,9 @@ export async function handleWebhook(rawBody, header) {
   if (!verifyWebhookSignature(rawBody, header)) throw httpError(401, 'Invalid webhook signature', 'bad_signature');
   let event = {};
   try { event = JSON.parse(rawBody); } catch { throw httpError(400, 'Invalid webhook body'); }
-  if (event.event !== 'payment.success') return { ok: true };
+  // Zoho's dashboard calls it payment.succeeded; older docs say payment.success.
+  const type = String(event.event_type ?? event.event ?? event.type ?? '').toLowerCase();
+  if (!['payment.succeeded', 'payment.success'].includes(type)) return { ok: true };
   const sessionId = extractSessionId(event);
   if (!sessionId) return { ok: true };
   const order = await PaymentOrder.findOne({ gatewayOrderId: sessionId });
