@@ -11,7 +11,7 @@ export default function Header({ progress = 0, onBack, user, onLogout }) {
         <span className="bar-div" aria-hidden="true" />
         <div className="brand">
           <b>Client Onboarding</b>
-          <span>Investment Advisory · Murali Krishna Sivvala · SEBI RIA INA000021261</span>
+          <span>Investment Advisory · Growsin Private Limited · SEBI RIA INA000021261</span>
         </div>
         <span className="bar-sp" />
         {user && (

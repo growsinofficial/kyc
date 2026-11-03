@@ -196,7 +196,7 @@ function Onboarding() {
         {showRail && <ProgressRail step={step} status={status} onGo={go} client={client} progress={progress} />}
         <div className="work">{content}</div>
       </main>
-      <footer className="foot-note">Growsin · Murali Krishna Sivvala, SEBI Registered Investment Adviser INA000021261 · Investments in securities markets are subject to market risks.</footer>
+      <footer className="foot-note">Growsin Private Limited · SEBI Registered Investment Adviser INA000021261 · Investments in securities markets are subject to market risks.</footer>
     </>
   )
 }
