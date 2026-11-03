@@ -348,6 +348,105 @@ router.post('/professional', protect, [
   }
 });
 
+const OCCUPATIONS = ['Salaried Employee', 'Self Employed', 'Business Owner', 'Professional', 'Student', 'Retired', 'Homemaker', 'Others'];
+const INDUSTRIES = ['Information Technology', 'Banking & Finance', 'Healthcare', 'Education', 'Manufacturing', 'Retail', 'Real Estate', 'Government', 'Agriculture', 'Others'];
+const EXPERIENCE = ['0-2 years', '2-5 years', '5-10 years', '10+ years'];
+const INCOME = ['Below 3 Lakhs', '3-5 Lakhs', '5-10 Lakhs', '10-25 Lakhs', '25-50 Lakhs', 'Above 50 Lakhs'];
+
+// @desc    Save all client details in one step (personal + address + professional)
+//          and submit KYC. Used by the single "Client details" screen.
+// @route   POST /api/kyc/details
+// @access  Private
+router.post('/details', protect, [
+  body('personal.name').trim().notEmpty().withMessage('Full name is required'),
+  body('personal.fatherName').trim().notEmpty().withMessage("Father's name is required"),
+  body('personal.dob').isISO8601().withMessage('Valid date of birth is required'),
+  body('personal.pan').customSanitizer((v) => String(v || '').toUpperCase().replace(/\s/g, ''))
+    .custom((v) => validatePAN(v)).withMessage('PAN must be 5 letters, 4 digits and 1 letter'),
+  body('personal.aadhar').customSanitizer((v) => String(v || '').replace(/\D/g, ''))
+    .custom((v) => validateAadhaar(v)).withMessage('Aadhaar must have 12 digits'),
+  body('personal.gender').isIn(['Male', 'Female', 'Other']).withMessage('Select a gender'),
+  body('personal.maritalStatus').isIn(['Single', 'Married', 'Divorced', 'Widowed']).withMessage('Select a marital status'),
+  body('address.address').trim().notEmpty().withMessage('Address is required'),
+  body('address.city').trim().notEmpty().withMessage('City is required'),
+  body('address.state').trim().notEmpty().withMessage('State is required'),
+  body('address.country').optional().trim(),
+  body('address.pincode').custom((v) => validatePincode(String(v || ''))).withMessage('PIN code must have 6 digits'),
+  body('address.mobile').customSanitizer((v) => String(v || '').replace(/\D/g, '').slice(-10))
+    .custom((v) => validateMobile(v)).withMessage('Enter a 10-digit mobile number'),
+  body('address.email').custom((v) => validateEmail(String(v || ''))).withMessage('Enter a valid email address'),
+  body('professional.occupation').isIn(OCCUPATIONS).withMessage('Select an occupation'),
+  body('professional.industry').isIn(INDUSTRIES).withMessage('Select an industry'),
+  body('professional.experience').isIn(EXPERIENCE).withMessage('Select your experience'),
+  body('professional.income').isIn(INCOME).withMessage('Select an income range'),
+], async (req, res, next) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, error: errors.array()[0].msg, details: errors.array() });
+    }
+    const { personal, address, professional } = req.body;
+
+    if (!isAdult(personal.dob)) {
+      return res.status(400).json({ success: false, error: 'You must be at least 18 years old' });
+    }
+    const duplicate = await KYCData.findOne({
+      userId: { $ne: req.user._id },
+      $or: [{ 'personal.pan': personal.pan }, { 'personal.aadhar': personal.aadhar }],
+    }).select('personal.pan');
+    if (duplicate) {
+      const field = duplicate.personal?.pan === personal.pan ? 'PAN' : 'Aadhaar number';
+      return res.status(400).json({ success: false, error: `This ${field} is already registered with another account` });
+    }
+
+    const data = {
+      personal: {
+        name: personal.name.trim(),
+        fatherName: personal.fatherName.trim(),
+        dob: new Date(personal.dob),
+        pan: personal.pan,
+        aadhar: personal.aadhar,
+        gender: personal.gender,
+        maritalStatus: personal.maritalStatus,
+      },
+      address: {
+        address: address.address.trim(),
+        city: address.city.trim(),
+        state: address.state.trim(),
+        country: (address.country || 'India').trim(),
+        pincode: String(address.pincode),
+        mobile: address.mobile,
+        email: String(address.email).toLowerCase().trim(),
+      },
+      professional: {
+        occupation: professional.occupation,
+        otherOccupation: professional.occupation === 'Others' ? professional.otherOccupation || 'Other' : undefined,
+        industry: professional.industry,
+        otherIndustry: professional.industry === 'Others' ? professional.otherIndustry || 'Other' : undefined,
+        experience: professional.experience,
+        income: professional.income,
+      },
+    };
+
+    let kycData = await KYCData.findOne({ userId: req.user._id });
+    if (!kycData) kycData = new KYCData({ userId: req.user._id });
+    kycData.set(data);
+    kycData.verificationStatus = { personal: 'pending', address: 'pending', professional: 'pending' };
+    kycData.submittedAt = new Date();
+    await kycData.save();
+
+    await User.findByIdAndUpdate(req.user._id, {
+      kycData: kycData._id,
+      name: data.personal.name,
+      kycStatus: 'pending_review',
+    });
+
+    res.status(200).json({ success: true, message: 'Client details saved', kyc: kycData });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // @desc    Submit KYC for review
 // @route   POST /api/kyc/submit
 // @access  Private

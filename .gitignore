@@ -5,3 +5,7 @@ backend/.env.*
 *.env
 *.env.local
 *.log
+
+# Agreement template (contains the adviser signature) and other private files
+backend/private/
+!backend/.env.example
