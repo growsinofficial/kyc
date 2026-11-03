@@ -100,6 +100,7 @@ class ApiService {
 
   // ---- Payment ----
   paymentSummary() { return this.request('/payments/summary') }
+  paymentHistory() { return this.request('/payments/history') }
   validateCoupon(code) { return this.request('/payments/coupons/validate', { method: 'POST', body: { code } }) }
   createOrder(couponCode) { return this.request('/payments/order', { method: 'POST', body: { couponCode: couponCode || undefined } }) }
   verifyPayment(orderId, paymentId, signature) { return this.request('/payments/verify', { method: 'POST', body: { orderId, paymentId, signature } }) }

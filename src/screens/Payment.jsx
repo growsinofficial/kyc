@@ -195,17 +195,3 @@ export default function Payment({ onBack, onPaid }) {
     </section>
   )
 }
-
-export function Done({ user, onDownload }) {
-  return (
-    <section className="card panel" aria-labelledby="done-h">
-      <div className="p-head"><h1 id="done-h">You're all set{user?.name ? `, ${user.name.split(' ')[0]}` : ''}</h1><p>Your onboarding is complete. Your adviser will be in touch with your first recommendations.</p></div>
-      <ol className="tl">
-        <li>Client details and risk profile<small>Submitted</small></li>
-        <li>Investment Advisory Agreement<small>Signed with Aadhaar eSign</small></li>
-        <li>Advisory fee<small>Paid</small></li>
-      </ol>
-      <div className="actions"><span className="note" /><button type="button" className="btn ghost" onClick={onDownload}>Download signed agreement</button></div>
-    </section>
-  )
-}

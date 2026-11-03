@@ -9,7 +9,8 @@ import Auth, { ResetPassword } from './screens/Auth'
 import Details from './screens/Details'
 import Risk from './screens/Risk'
 import Review from './screens/Review'
-import Payment, { Done } from './screens/Payment'
+import Payment from './screens/Payment'
+import Done from './screens/Done'
 import EsignReturn from './screens/EsignReturn'
 
 // The signing screen carries the PDF viewer; load it only when needed.
@@ -184,7 +185,7 @@ function Onboarding() {
         content = <Payment onBack={() => go('sign')} onPaid={async () => { setExplicit(false); await loadAll() }} />
         break
       default:
-        content = <Done user={user} onDownload={downloadSigned} />
+        content = <Done user={user} agreement={agreement} risk={risk} onDownload={downloadSigned} onLogout={logout} />
     }
   }
 

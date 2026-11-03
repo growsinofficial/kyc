@@ -384,3 +384,49 @@ footer.foot-note { font-size: 12px; color: var(--muted); text-align: center; pad
 @media (max-width: 760px) { .sheet .actions { position: static; box-shadow: none; padding: 12px 0 0; background: none; backdrop-filter: none; -webkit-backdrop-filter: none } .sheet .actions .note { display: block } }
 
 @media (max-width: 760px) { .po-plan, .po-coupon { background: #fff; border: 0; border-radius: 18px; box-shadow: 0 1px 2px rgba(27,107,58,.05), 0 10px 30px -22px rgba(27,107,58,.35) } .po-plan { border-left: 4px solid var(--brand) } }
+
+/* ---- Final screen ---- */
+.shell.solo:has(.done) { max-width: 760px }
+.done { background: var(--bg); border-radius: 20px; overflow: hidden; box-shadow: var(--shadow); display: grid }
+.done-hero { position: relative; background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #FFFFFF; padding: 32px 28px 72px; display: grid; gap: 6px; justify-items: start }
+.done-hero::after { content: ""; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px; border-radius: 50%; background: rgba(255,255,255,.08) }
+.done-badge { width: 52px; height: 52px; border-radius: 50%; background: #FFFFFF; position: relative; margin-bottom: 8px; box-shadow: 0 0 0 8px rgba(255,255,255,.18) }
+.done-badge::after { content: ""; position: absolute; left: 18px; top: 13px; width: 12px; height: 22px; border: solid var(--brand); border-width: 0 4px 4px 0; transform: rotate(45deg) }
+.done-kicker { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; opacity: .85 }
+.done-hero h1 { margin: 0; font-size: 28px; line-height: 1.15; font-weight: 800; letter-spacing: -.01em }
+.done-hero p { margin: 0; max-width: 46ch; font-size: 15px; opacity: .92 }
+.done-body { padding: 24px 28px 8px; display: grid; gap: 22px }
+.done-tiles { margin: -48px 0 0; position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px }
+.done-tiles > div { background: #FFFFFF; border: 1px solid var(--tint); border-radius: 14px; padding: 14px; box-shadow: 0 10px 24px -18px rgba(27,107,58,.45) }
+.done-tiles dt { font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted) }
+.done-tiles dd { margin: 4px 0 0; font-size: 16px; font-weight: 800; color: var(--brand); line-height: 1.25; overflow-wrap: anywhere }
+.done-tiles dd small { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 2px }
+.done-sec h2, .done-next h2 { margin: 0 0 12px; font-size: 16px; color: var(--brand) }
+.done-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0 }
+.done-steps li { position: relative; padding: 0 0 18px 40px; display: grid; gap: 2px }
+.done-steps li:last-child { padding-bottom: 0 }
+.done-steps li::before { content: ""; position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--brand-2) }
+.done-steps li::after { content: ""; position: absolute; left: 9px; top: 6px; width: 6px; height: 11px; border: solid #FFFFFF; border-width: 0 2.5px 2.5px 0; transform: rotate(45deg) }
+.done-steps li:not(:last-child) { background: linear-gradient(var(--tint), var(--tint)) 12px 30px / 2px calc(100% - 30px) no-repeat }
+.done-steps b { font-size: 14.5px; color: var(--ink) }
+.done-steps span { font-size: 13.5px; color: var(--muted) }
+.done-steps small { font-size: 12px; color: var(--muted); overflow-wrap: anywhere }
+.done-steps .link-btn { justify-self: start; margin-top: 2px }
+.done-next { background: var(--tint); border-radius: 14px; padding: 16px 18px }
+.done-next ol { margin: 0; padding: 0; list-style: none; counter-reset: n; display: grid; gap: 12px }
+.done-next li { counter-increment: n; display: grid; grid-template-columns: 26px minmax(0, 1fr); column-gap: 12px; row-gap: 1px }
+.done-next li::before { content: counter(n); grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; background: #FFFFFF; color: var(--brand); border: 1.5px solid var(--brand-2); display: grid; place-items: center; font-size: 12.5px; font-weight: 800 }
+.done-next b { font-size: 14px; color: var(--ink) } .done-next span { font-size: 13px; color: var(--muted) }
+.done-mail { margin: 0; font-size: 13px; color: var(--muted) } .done-mail b { color: var(--ink); font-weight: 600 }
+.done-actions { padding: 16px 28px 24px; border-top: 1px solid var(--tint); margin-top: 8px }
+@media (max-width: 760px) {
+  .done { border-radius: 0; box-shadow: none; background: transparent }
+  .done-hero { padding: 28px 20px 64px }
+  .done-hero h1 { font-size: 25px }
+  .done-body { padding: 0 16px 8px; gap: 16px }
+  .done-tiles { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-top: -44px }
+  .done-tiles > div:last-child { grid-column: span 2 }
+  .done-next { background: #FFFFFF; border: 1.5px solid var(--tint); box-shadow: 0 1px 2px rgba(27,107,58,.05), 0 10px 30px -22px rgba(27,107,58,.35); border-radius: 18px }
+  .done-sec { background: #FFFFFF; border-radius: 18px; padding: 18px 16px; box-shadow: 0 1px 2px rgba(27,107,58,.05), 0 10px 30px -22px rgba(27,107,58,.35) }
+  .done-mail { padding: 0 4px }
+}
