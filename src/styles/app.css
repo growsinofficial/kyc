@@ -20,12 +20,12 @@ button, input, select { font: inherit }
 
 /* ---------- Header ---------- */
 .bar { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line) }
-.bar-in { display: flex; align-items: center; gap: 18px; padding: 16px max(20px, env(safe-area-inset-right)) 16px max(20px, env(safe-area-inset-left)); max-width: 1440px; margin: 0 auto }
-.logo-img { height: 50px; width: auto; display: block; flex: none }
-.bar-div { width: 1px; height: 36px; background: var(--line-2); flex: none }
+.bar-in { display: flex; align-items: center; gap: 18px; padding: 18px max(20px, env(safe-area-inset-right)) 18px max(20px, env(safe-area-inset-left)); max-width: 1440px; margin: 0 auto }
+.logo-img { height: 56px; width: auto; display: block; flex: none }
+.bar-div { width: 1px; height: 40px; background: var(--line-2); flex: none }
 .brand { display: grid; line-height: 1.2; min-width: 0 }
-.brand b { font-size: 19px; color: var(--ink-2); font-weight: 800; letter-spacing: -.01em; white-space: nowrap }
-.brand span { font-size: 13.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.brand b { font-size: 21px; color: var(--ink-2); font-weight: 800; letter-spacing: -.01em; white-space: nowrap }
+.brand span { font-size: 14.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 .bar-sp { flex: 1 }
 .bar-user { display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: var(--muted) }
 .hb-back { all: unset; cursor: pointer; display: none; place-items: center; width: 40px; height: 40px; border-radius: 12px; color: var(--ink-2); margin-left: -6px; flex: none; font-size: 22px; line-height: 1 }
@@ -289,9 +289,9 @@ footer.foot-note { font-size: 12px; color: var(--muted); text-align: center; pad
 /* ---------- Phone ---------- */
 @media (max-width: 760px) {
   body { background: var(--canvas) }
-  .bar-in { padding-block: 13px; gap: 10px }
-  .logo-img { height: 42px }
-  .brand b { font-size: 17px } .bar-div { height: 28px }
+  .bar-in { padding-block: 15px; gap: 10px }
+  .logo-img { height: 47px }
+  .brand b { font-size: 18.5px } .bar-div { height: 32px }
   .hb-back { display: grid }
   .bar-user { display: none }
   .progress { height: 4px }
@@ -337,8 +337,8 @@ footer.foot-note { font-size: 12px; color: var(--muted); text-align: center; pad
   .toasts { left: 16px; right: 16px; bottom: calc(96px + env(safe-area-inset-bottom)) }
   .toast { max-width: none }
 }
-@media (max-width: 400px) { .logo-img { height: 38px } .brand b { font-size: 15.5px } .bar-in { gap: 9px } }
-@media (max-width: 350px) { .logo-img { height: 30px } .brand b { font-size: 13.5px } .bar-div { display: none } }
+@media (max-width: 400px) { .logo-img { height: 42px } .brand b { font-size: 16.5px } .bar-in { gap: 9px } }
+@media (max-width: 350px) { .logo-img { height: 33px } .brand b { font-size: 14.5px } .bar-div { display: none } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important } }
 
 /* ---- Review order / coupons (same layout as the Growsin app) ---- */
