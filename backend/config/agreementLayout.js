@@ -94,10 +94,16 @@ export const OVERLAYS = [
  * Aadhaar eSign appearance here: under "Client Sign:" (p1),
  * "Signature:" (p19) and "Client Signature" (p23).
  */
+// All three boxes are the same size so the Aadhaar eSign stamp looks the same
+// (same size, same position inside the box) on every page. Measured on the
+// stored template with pdftotext -bbox: each box sits in the empty signature
+// space under/next to its label and clear of the Date/Name lines below it.
+const SIGN_W = 160;
+const SIGN_H = 48;
 export const CLIENT_SIGNATURE_BOXES = [
-  { page: 1, x: 402, y: 685, w: 136, h: 38 },
-  { page: 19, x: 112, y: 436, w: 150, h: 28 },
-  { page: 23, x: 58.8, y: 671, w: 170, h: 44 },
+  { page: 1, x: 400, y: 686, w: SIGN_W, h: SIGN_H },  // under "Client Sign:" (label at y 670-681; disclaimer from y 758)
+  { page: 19, x: 110, y: 434, w: SIGN_W, h: SIGN_H }, // right of "Signature:" (label at y 445-455; "Client Name" ends y 428; "Date:" at y 525)
+  { page: 23, x: 58, y: 668, w: SIGN_W, h: SIGN_H },  // under "Client Signature" (label at y 655-665; "Name:" at y 733)
 ];
 
 /** Digio expects bottom-left coordinates: { "1": [{llx,lly,urx,ury}] } */
