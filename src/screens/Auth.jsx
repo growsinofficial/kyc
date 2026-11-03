@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import api from '../services/api'
 import { TextField, OtpInput } from '../components/Field'
 import { useToast } from '../components/toastContext'
@@ -21,16 +21,28 @@ export default function Auth({ onSignedIn }) {
   )
 }
 
+const RESEND_SECONDS = 60 // matches the server's resend wait
+
 function Signup({ onSignedIn }) {
   const toast = useToast()
-  const [stage, setStage] = useState('form') // form | email | mobile
+  const [stage, setStage] = useState('form') // form | otp
   const [f, setF] = useState({ name: '', email: '', mobile: '', password: '' })
   const [errors, setErrors] = useState({})
   const [otp, setOtp] = useState('')
+  const [channel, setChannel] = useState('') // whatsapp | sms | test
+  const [hint, setHint] = useState('')
+  const [resendIn, setResendIn] = useState(0)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [hint, setHint] = useState('')
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }))
+  const mobile = normalizeMobile(f.mobile)
+  const shown = `+91 ${mobile.slice(0, 5)} ${mobile.slice(5)}`
+
+  useEffect(() => {
+    if (resendIn <= 0) return undefined
+    const t = setTimeout(() => setResendIn((n) => n - 1), 1000)
+    return () => clearTimeout(t)
+  }, [resendIn])
 
   const validate = () => {
     const e = {}
@@ -47,59 +59,55 @@ function Signup({ onSignedIn }) {
     try { await fn() } catch (e) { setErr(e.message) } finally { setBusy(false) }
   }
 
-  const sendEmail = () => run(async () => {
-    if (!validate()) return
-    const res = await api.sendEmailOTP(f.email.trim())
+  const send = (opts = {}) => run(async () => {
+    const res = await api.sendMobileOTP(mobile, { email: f.email.trim(), channel: opts.channel })
+    setChannel(res.channel)
     setHint(res.testOtp ? `Test mode code: ${res.testOtp}` : '')
-    setOtp(''); setStage('email')
-    toast(`Code sent to ${f.email.trim()}`)
+    setOtp(''); setStage('otp'); setResendIn(RESEND_SECONDS)
+    if (opts.toastText) toast(opts.toastText)
   })
 
-  const verifyEmail = (code = otp) => run(async () => {
-    if (code.length !== 6) { setErr('Enter the 6-digit code'); return }
-    await api.verifyEmailOTP(f.email.trim(), code)
-    await api.register({ name: f.name.trim(), email: f.email.trim(), mobile: normalizeMobile(f.mobile), password: f.password })
-    const res = await api.sendMobileOTP(normalizeMobile(f.mobile))
-    setHint(res.testOtp ? `Test mode code: ${res.testOtp}` : '')
-    setOtp(''); setStage('mobile')
-    toast('Account created. Now verify your mobile number.')
-  })
+  const start = () => { if (validate()) send() }
 
-  const verifyMobile = (code = otp) => run(async () => {
+  const verify = (code = otp) => run(async () => {
     if (code.length !== 6) { setErr('Enter the 6-digit code'); return }
-    await api.verifyMobileOTP(normalizeMobile(f.mobile), code)
+    await api.register({ name: f.name.trim(), email: f.email.trim(), mobile, password: f.password, otp: code })
     const me = await api.me()
     onSignedIn(me.user)
   })
 
   if (stage === 'form') {
     return (
-      <form className="group" onSubmit={(e) => { e.preventDefault(); sendEmail() }} noValidate>
+      <form className="group" onSubmit={(e) => { e.preventDefault(); start() }} noValidate>
         <TextField label="Full name (as per PAN)" value={f.name} onChange={set('name')} error={errors.name} autoComplete="name" />
         <TextField label="Email" type="email" value={f.email} onChange={set('email')} error={errors.email} autoComplete="email" />
         <TextField label="Mobile number" prefix="+91" inputMode="tel" value={f.mobile} onChange={set('mobile')} error={errors.mobile} autoComplete="tel-national" />
         <TextField label="Password" type="password" value={f.password} onChange={set('password')} error={errors.password} autoComplete="new-password" help="At least 6 characters" />
         {err && <p className="err-box" role="alert">{err}</p>}
-        <div className="actions"><span className="note">We'll send a code to your email.</span><button className="btn" type="submit" disabled={busy}>{busy && <span className="spin" />}Continue</button></div>
+        <div className="actions"><span className="note">We'll send a code to your mobile on WhatsApp.</span><button className="btn" type="submit" disabled={busy}>{busy && <span className="spin" />}Continue</button></div>
       </form>
     )
   }
 
-  const isEmailStage = stage === 'email'
   return (
-    <form className="group" onSubmit={(e) => { e.preventDefault(); isEmailStage ? verifyEmail() : verifyMobile() }} noValidate>
-      <p className="center">Enter the 6-digit code sent to <b>{isEmailStage ? f.email : `+91 ${normalizeMobile(f.mobile)}`}</b></p>
-      <OtpInput value={otp} onChange={setOtp} onComplete={(c) => (isEmailStage ? verifyEmail(c) : verifyMobile(c))} disabled={busy} />
+    <form className="group" onSubmit={(e) => { e.preventDefault(); verify() }} noValidate>
+      <p className="center">
+        {channel === 'whatsapp' ? 'Enter the 6-digit code sent on WhatsApp to ' : 'Enter the 6-digit code sent to '}
+        <b>{shown}</b>
+      </p>
+      <OtpInput value={otp} onChange={setOtp} onComplete={(c) => verify(c)} disabled={busy} />
       {hint && <p className="info-box center">{hint}</p>}
       <div className="otp-meta">
-        {isEmailStage ? <button type="button" className="link-btn" onClick={() => setStage('form')}>Change details</button> : <span />}
-        <button type="button" className="link-btn" disabled={busy} onClick={() => run(async () => {
-          const res = isEmailStage ? await api.sendEmailOTP(f.email.trim()) : await api.sendMobileOTP(normalizeMobile(f.mobile))
-          setHint(res.testOtp ? `Test mode code: ${res.testOtp}` : ''); toast('A new code has been sent')
-        })}>Resend code</button>
+        <button type="button" className="link-btn" onClick={() => { setStage('form'); setErr('') }}>Change number</button>
+        {resendIn > 0
+          ? <span>Resend code in {Math.floor(resendIn / 60)}:{String(resendIn % 60).padStart(2, '0')}</span>
+          : <button type="button" className="link-btn" disabled={busy} onClick={() => send({ toastText: 'New code sent' })}>Didn't get it? Resend</button>}
       </div>
+      {channel === 'whatsapp' && resendIn === 0 && (
+        <p className="otp-sms">Didn't get it on WhatsApp? <button type="button" className="link-btn" disabled={busy} onClick={() => send({ channel: 'sms', toastText: 'Code sent by SMS' })}>Send by SMS</button></p>
+      )}
       {err && <p className="err-box" role="alert">{err}</p>}
-      <div className="actions"><span className="note">{isEmailStage ? 'Step 1 of 2: verify email' : 'Step 2 of 2: verify mobile'}</span><button className="btn" type="submit" disabled={busy}>{busy && <span className="spin" />}{isEmailStage ? 'Verify email' : 'Verify mobile'}</button></div>
+      <div className="actions"><span className="note">Verify your mobile number</span><button className="btn" type="submit" disabled={busy}>{busy && <span className="spin" />}Verify &amp; continue</button></div>
     </form>
   )
 }

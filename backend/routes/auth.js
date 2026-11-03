@@ -8,8 +8,20 @@ import { protect } from '../middleware/auth.js';
 import { sendEmail } from '../utils/email.js';
 import { syncNewUserToZoho } from '../middleware/zohoSync.js';
 import { generateOTP } from '../utils/helpers.js';
+import { issueOtp, verifyOtp } from '../services/otp.js';
 
 const router = express.Router();
+
+const normalizeMobile = (v) => String(v || '').replace(/\D/g, '').slice(-10);
+
+// Returns an error message when the email or mobile already has an account.
+async function accountTaken(email, mobile) {
+  const existing = await User.findOne({ $or: [...(email ? [{ email }] : []), { mobile }] }).select('email mobile');
+  if (!existing) return null;
+  return existing.mobile === mobile
+    ? 'This mobile number already has an account. Please log in.'
+    : 'This email already has an account. Please log in.';
+}
 
 // Rate limiters
 const authIpLimiter = rateLimit({
@@ -177,91 +189,30 @@ const sendTokenResponse = (user, statusCode, res) => {
     });
 };
 
-// @desc    Register user
-// @route   POST /api/auth/register
+// @desc    Register: the mobile number must be verified with the code sent by
+//          WhatsApp/SMS (see /send-mobile-otp). Email is required but not verified.
+// @route   POST /api/auth/register   body: { name, email, mobile, password, otp }
 // @access  Public
 router.post('/register', registerLimiter, [
-  body('name').notEmpty().withMessage('Name is required'),
-  body('email').isEmail().withMessage('Please include a valid email'),
-  body('mobile').isMobilePhone('en-IN').withMessage('Please include a valid mobile number'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+  body('name').trim().isLength({ min: 2 }).withMessage('Name is required'),
+  body('email').isEmail().withMessage('Please include a valid email').normalizeEmail({ gmail_remove_dots: false }),
+  body('mobile').customSanitizer(normalizeMobile).matches(/^[6-9]\d{9}$/).withMessage('Please include a valid mobile number'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('otp').matches(/^\d{6}$/).withMessage('Enter the 6-digit code sent to your mobile')
 ], syncNewUserToZoho, async (req, res, next) => {
   try {
-    console.log('🔍 Register endpoint hit:', req.body);
-    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('❌ Validation errors:', errors.array());
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        details: errors.array()
-      });
+      return res.status(400).json({ success: false, error: errors.array()[0].msg, details: errors.array() });
     }
+    const { name, email, mobile, password, otp } = req.body;
 
-    const { name, email, mobile, password } = req.body;
+    const taken = await accountTaken(email, mobile);
+    if (taken) return res.status(400).json({ success: false, error: taken });
 
-    // Check if user already exists
-    const existingUser = await User.findOne({
-      $or: [{ email }, { mobile }]
-    });
+    await verifyOtp(mobile, 'signup', otp);
 
-    if (existingUser) {
-      const field = existingUser.email === email ? 'email' : 'mobile';
-      return res.status(400).json({
-        success: false,
-        error: `User with this ${field} already exists`
-      });
-    }
-
-    // Create user
-    const user = await User.create({
-      name,
-      email,
-      mobile,
-      password
-    });
-
-    // Generate email verification token
-    const emailToken = crypto.randomBytes(20).toString('hex');
-    user.emailVerificationToken = emailToken;
-    user.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-
-    // Generate mobile OTP - use dummy value in test mode
-    const mobileOTP = process.env.TEST_MODE === 'true' ? '654321' : generateOTP();
-    user.mobileVerificationOTP = mobileOTP;
-    user.mobileVerificationExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-
-    await user.save();
-
-    // Send verification email
-    try {
-      const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${emailToken}`;
-      const message = `
-        <h1>Welcome to KYC Platform!</h1>
-        <p>Please click the link below to verify your email address:</p>
-        <a href="${verificationUrl}" target="_blank">Verify Email</a>
-        <p>This link will expire in 24 hours.</p>
-      `;
-
-      await sendEmail({
-        to: user.email,
-        subject: 'Email Verification - KYC Platform',
-        html: message
-      });
-    } catch (err) {
-      console.error('Email sending failed:', err);
-      // Continue registration even if email fails
-    }
-
-    // In test mode or real app, log/send SMS
-    if (process.env.TEST_MODE === 'true') {
-      console.log(`🧪 TEST MODE - Mobile OTP for ${mobile}: ${mobileOTP}`);
-    } else {
-      // In a real app, you would send SMS here
-      console.log(`Mobile OTP for ${mobile}: ${mobileOTP}`);
-    }
-
+    const user = await User.create({ name, email, mobile, password, mobileVerified: true, emailVerified: false });
     sendTokenResponse(user, 201, res);
   } catch (error) {
     next(error);
@@ -382,7 +333,6 @@ router.post('/test-verify-email', (req, res) => {
 // @access  Public
 router.post('/verify-email-otp', emailOtpLimiter, async (req, res, next) => {
   try {
-    console.log('🔍 Verify Email OTP endpoint hit:', req.body);
     
     const { email, otp } = req.body;
     
@@ -485,151 +435,33 @@ router.post('/verify-email-otp', emailOtpLimiter, async (req, res, next) => {
   }
 });
 
-// @desc    Send OTP for mobile verification
-// @route   POST /api/auth/send-mobile-otp
+// @desc    Send a mobile code: WhatsApp first, SMS if WhatsApp fails.
+//          channel: 'sms' skips WhatsApp ("Didn't get it on WhatsApp? Send by SMS").
+//          With an email, it is a sign-up code (checks the email/mobile are free).
+// @route   POST /api/auth/send-mobile-otp   body: { mobile, email?, channel? }
 // @access  Public
 router.post('/send-mobile-otp', mobileOtpLimiter, [
-  body('mobile').isMobilePhone('en-IN').withMessage('Please provide a valid Indian mobile number')
+  body('mobile').customSanitizer(normalizeMobile).matches(/^[6-9]\d{9}$/).withMessage('Please provide a valid Indian mobile number'),
+  body('email').optional({ values: 'falsy' }).isEmail().withMessage('Please include a valid email').normalizeEmail({ gmail_remove_dots: false })
 ], async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Validation failed', 
-        details: errors.array() 
-      });
+      return res.status(400).json({ success: false, error: errors.array()[0].msg });
     }
+    const { mobile, email } = req.body;
+    const taken = await accountTaken(email, mobile);
+    if (taken) return res.status(400).json({ success: false, error: taken });
 
-    const { mobile } = req.body;
-    
-    // For signup flow, we'll store OTP temporarily even if user doesn't exist yet
-    // Check if user exists, if not create a temporary record or use session storage
-    let user = await User.findOne({ mobile });
-    
-    if (!user) {
-      // For demo purposes, we'll send OTP even if user doesn't exist
-      // In production, you might want to create a temporary verification record
-      const otp = process.env.TEST_MODE === 'true' ? '654321' : generateOTP();
-      
-      console.log(`🧪 TEST MODE - Mobile OTP for ${mobile}: ${otp} (user will be created later)`);
-      
-      return res.status(200).json({
-        success: true,
-        message: 'A verification code has been sent to your mobile number.',
-        ...(process.env.TEST_MODE === 'true' && { testOtp: otp })
-      });
-    }
-
-    // User exists - normal flow
-    // Check cooldown (reduced for development)
-    const cooldownTime = process.env.NODE_ENV === 'development' ? 5000 : 30000; // 5s dev, 30s prod
-    if (user.lastOtpSentAt && (new Date() - new Date(user.lastOtpSentAt)) < cooldownTime) {
-      const timeLeft = Math.ceil((cooldownTime - (new Date() - new Date(user.lastOtpSentAt))) / 1000);
-      return res.status(429).json({
-        success: false,
-        error: `Please wait ${timeLeft} seconds before requesting another OTP.`
-      });
-    }
-
-    // Generate OTP - use dummy value in test mode
-    const otp = process.env.TEST_MODE === 'true' ? '654321' : generateOTP();
-    user.mobileVerificationOTP = otp;
-    user.mobileVerificationExpires = Date.now() + 10 * 60 * 1000; // 10-minute expiry
-    user.lastOtpSentAt = new Date();
-    await user.save();
-
-    // In test mode, log the OTP to console
-    if (process.env.TEST_MODE === 'true') {
-      console.log(`🧪 TEST MODE - Mobile OTP for ${mobile}: ${otp}`);
-    }
-
-    // In production, you would send SMS here
-    // await sendSMS(mobile, `Your verification code is: ${otp}`);
-
+    const result = await issueOtp(mobile, 'signup', { smsOnly: req.body.channel === 'sms' });
     res.status(200).json({
       success: true,
-      message: 'A verification code has been sent to your mobile number.',
-      ...(process.env.TEST_MODE === 'true' && { testOtp: otp }) // Include OTP in response for testing
+      channel: result.channel,
+      message: result.channel === 'whatsapp' ? 'Code sent on WhatsApp' : 'Code sent by SMS',
+      ...(result.testOtp && { testOtp: result.testOtp })
     });
-
   } catch (error) {
-    next(error);
-  }
-});
-
-// @desc    Verify mobile OTP
-// @route   POST /api/auth/verify-mobile-otp
-// @access  Public
-router.post('/verify-mobile-otp', mobileOtpLimiter, [
-  body('mobile').isMobilePhone('en-IN').withMessage('Please provide a valid Indian mobile number'),
-  body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits')
-], async (req, res, next) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        details: errors.array()
-      });
-    }
-
-    const { mobile, otp } = req.body;
-    
-    // In test mode, accept the dummy OTP even if user doesn't exist yet
-    if (process.env.TEST_MODE === 'true' && otp === '654321') {
-      return res.status(200).json({
-        success: true,
-        message: 'Mobile number verified successfully (test mode)'
-      });
-    }
-    
-    const user = await User.findOne({ mobile });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found. Please register first.'
-      });
-    }
-
-    // Check if OTP exists and not expired
-    if (!user.mobileVerificationOTP || !user.mobileVerificationExpires) {
-      return res.status(400).json({
-        success: false,
-        error: 'No active OTP found. Please request a new one.'
-      });
-    }
-
-    // Check expiration
-    if (new Date() > user.mobileVerificationExpires) {
-      return res.status(400).json({
-        success: false,
-        error: 'OTP has expired. Please request a new one.'
-      });
-    }
-
-    // Verify OTP
-    if (user.mobileVerificationOTP !== otp) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid OTP'
-      });
-    }
-
-    // Success - mark mobile as verified
-    user.mobileVerified = true;
-    user.mobileVerificationOTP = undefined;
-    user.mobileVerificationExpires = undefined;
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Mobile number verified successfully'
-    });
-
-  } catch (error) {
+    if (error.retryAfter) return res.status(429).json({ success: false, error: error.message, retryAfter: error.retryAfter });
     next(error);
   }
 });
@@ -732,93 +564,33 @@ router.get('/verify-email/:token', async (req, res, next) => {
   }
 });
 
-// @desc    Verify mobile OTP
-// @route   POST /api/auth/verify-mobile
+// @desc    Verify the mobile number of a logged-in account (older accounts)
+// @route   POST /api/auth/verify-mobile   body: { otp }
 // @access  Private
 router.post('/verify-mobile', protect, [
-  body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits')
+  body('otp').matches(/^\d{6}$/).withMessage('Enter the 6-digit code')
 ], async (req, res, next) => {
   try {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        details: errors.array()
-      });
-    }
-
-    const { otp } = req.body;
-    const user = req.user;
-
-    if (!user.mobileVerificationOTP || !user.mobileVerificationExpires) {
-      return res.status(400).json({
-        success: false,
-        error: 'No OTP found. Please request a new one.'
-      });
-    }
-
-    if (user.mobileVerificationExpires < Date.now()) {
-      return res.status(400).json({
-        success: false,
-        error: 'OTP has expired. Please request a new one.'
-      });
-    }
-
-    if (user.mobileVerificationOTP !== otp) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid OTP'
-      });
-    }
-
-    user.mobileVerified = true;
-    user.mobileVerificationOTP = undefined;
-    user.mobileVerificationExpires = undefined;
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Mobile number verified successfully'
-    });
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, error: errors.array()[0].msg });
+    await verifyOtp(req.user.mobile, 'verify_mobile', req.body.otp);
+    await User.findByIdAndUpdate(req.user._id, { mobileVerified: true });
+    res.status(200).json({ success: true, message: 'Mobile number verified successfully' });
   } catch (error) {
     next(error);
   }
 });
 
-// @desc    Resend mobile OTP
-// @route   POST /api/auth/resend-otp
+// @desc    Send a mobile code to a logged-in account (WhatsApp first, then SMS)
+// @route   POST /api/auth/resend-otp   body: { channel? }
 // @access  Private
-router.post('/resend-otp', protect, async (req, res, next) => {
+router.post('/resend-otp', protect, mobileOtpLimiter, async (req, res, next) => {
   try {
-    const user = req.user;
-
-    if (user.mobileVerified) {
-      return res.status(400).json({
-        success: false,
-        error: 'Mobile number is already verified'
-      });
-    }
-
-    // Generate new OTP - use dummy value in test mode
-    const mobileOTP = process.env.TEST_MODE === 'true' ? '654321' : generateOTP();
-    user.mobileVerificationOTP = mobileOTP;
-    user.mobileVerificationExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-    await user.save();
-
-    // In test mode or real app, log/send SMS
-    if (process.env.TEST_MODE === 'true') {
-      console.log(`🧪 TEST MODE - New Mobile OTP for ${user.mobile}: ${mobileOTP}`);
-    } else {
-      // In a real app, you would send SMS here
-      console.log(`New Mobile OTP for ${user.mobile}: ${mobileOTP}`);
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'OTP sent successfully'
-    });
+    if (req.user.mobileVerified) return res.status(400).json({ success: false, error: 'Mobile number is already verified' });
+    const result = await issueOtp(req.user.mobile, 'verify_mobile', { smsOnly: req.body?.channel === 'sms' });
+    res.status(200).json({ success: true, channel: result.channel, ...(result.testOtp && { testOtp: result.testOtp }) });
   } catch (error) {
+    if (error.retryAfter) return res.status(429).json({ success: false, error: error.message, retryAfter: error.retryAfter });
     next(error);
   }
 });

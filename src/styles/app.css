@@ -145,6 +145,7 @@ footer.foot-note { font-size: 12px; color: var(--muted); text-align: center; pad
 .otp { display: grid; grid-template-columns: repeat(6, minmax(0, 52px)); gap: 10px; justify-content: center }
 .otp input { height: 56px; text-align: center; font-size: 22px; font-weight: 700; border: 1.5px solid var(--line-2); border-radius: 12px; color: var(--ink-2); background: var(--bg); width: 100%; min-width: 0; font-variant-numeric: tabular-nums }
 .otp input:focus { outline: none; border-color: var(--brand-2); box-shadow: 0 0 0 4px rgba(45,134,83,.14) }
+.otp-sms { margin: 0; text-align: center; font-size: 13px; color: var(--muted) }
 .otp-meta { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted) }
 .center { text-align: center }
 

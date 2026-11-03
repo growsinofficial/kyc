@@ -56,10 +56,8 @@ class ApiService {
   }
 
   // ---- Auth ----
-  sendEmailOTP(email) { return this.request('/auth/send-email-otp', { method: 'POST', body: { email } }) }
-  verifyEmailOTP(email, otp) { return this.request('/auth/verify-email-otp', { method: 'POST', body: { email, otp } }) }
-  sendMobileOTP(mobile) { return this.request('/auth/send-mobile-otp', { method: 'POST', body: { mobile } }) }
-  verifyMobileOTP(mobile, otp) { return this.request('/auth/verify-mobile-otp', { method: 'POST', body: { mobile, otp } }) }
+  // Mobile code for sign-up: WhatsApp first, SMS fallback. channel 'sms' skips WhatsApp.
+  sendMobileOTP(mobile, { email, channel } = {}) { return this.request('/auth/send-mobile-otp', { method: 'POST', body: { mobile, email, channel } }) }
   async register(data) {
     const res = await this.request('/auth/register', { method: 'POST', body: data })
     this.setToken(res.token)
