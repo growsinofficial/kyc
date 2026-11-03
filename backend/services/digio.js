@@ -67,7 +67,7 @@ export async function createSignRequest({ pdf, fileName, signer, reference }) {
   const body = {
     file_name: fileName,
     file_data: Buffer.from(pdf).toString('base64'),
-    signers: [{ identifier: signer.identifier, name: signer.name, reason: 'Investment Advisory Agreement by Growsin Pvt. Ltd.', sign_type: 'aadhaar' }],
+    signers: [{ identifier: signer.identifier, name: signer.name, reason: 'Investment Advisory Agreement', sign_type: 'aadhaar' }],
     expire_in_days: 10,
     display_on_page: 'custom',
     sign_coordinates: { [signer.identifier]: coords },
