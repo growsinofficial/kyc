@@ -102,7 +102,7 @@ const SIGN_W = 160;
 const SIGN_H = 48;
 export const CLIENT_SIGNATURE_BOXES = [
   { page: 1, x: 400, y: 686, w: SIGN_W, h: SIGN_H },  // under "Client Sign:" (label at y 670-681; disclaimer from y 758)
-  { page: 19, x: 110, y: 466, w: SIGN_W, h: SIGN_H }, // in the gap between "Signature:" (ends y 455) and "Date:" (starts y 525), centred
+  { page: 19, x: 80, y: 466, w: SIGN_W, h: SIGN_H }, // in the gap between "Signature:" (ends y 455) and "Date:" (starts y 525), centred
   { page: 23, x: 58, y: 668, w: SIGN_W, h: SIGN_H },  // under "Client Signature" (label at y 655-665; "Name:" at y 733)
 ];
 
