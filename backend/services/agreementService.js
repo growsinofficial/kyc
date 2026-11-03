@@ -128,6 +128,19 @@ async function startEsignOnce(userId, id, returnBase) {
 }
 
 /**
+ * Digio sends times like "2026-11-03 23:08:54" in Indian time with no zone.
+ * Read them as IST; never accept a time in the future.
+ */
+export function digioTime(value) {
+  if (!value) return new Date();
+  const text = String(value).trim();
+  const hasZone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(text);
+  const d = new Date(hasZone ? text : `${text.replace(' ', 'T')}+05:30`);
+  if (Number.isNaN(d.getTime()) || d.getTime() > Date.now() + 5 * 60 * 1000) return new Date();
+  return d;
+}
+
+/**
  * Check the request with Digio and, once signed, store the signed PDF.
  * Safe to call many times (from the browser callback and the webhook).
  */
@@ -150,7 +163,7 @@ export async function syncEsign(agreement) {
     full.signedPdf = signed;
     full.status = 'signed';
     full.esign.status = 'signed';
-    full.esign.signedAt = party.updated_at ? new Date(party.updated_at) : new Date();
+    full.esign.signedAt = digioTime(party.updated_at);
     full.esign.signerDetails = party.pki_signature_details || null;
     full.markModified('esign');
     await full.save();
