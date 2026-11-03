@@ -1,26 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import api from '../services/api'
 import PdfViewer from '../components/PdfViewer'
 import { TextField, OtpInput } from '../components/Field'
 import { useToast } from '../components/toastContext'
 import { digitsOnly, formatDate } from '../constants/options'
-import logoUrl from '../assets/growsin-logo.png'
-
-const sdkPromises = {}
-function loadDigioSdk(url) {
-  if (window.Digio) return Promise.resolve()
-  if (!sdkPromises[url]) {
-    sdkPromises[url] = new Promise((resolve, reject) => {
-      const s = document.createElement('script')
-      s.src = url
-      s.async = true
-      s.onload = () => resolve()
-      s.onerror = () => { delete sdkPromises[url]; reject(new Error('Could not load the Digio eSign window. Check your connection and try again.')) }
-      document.head.appendChild(s)
-    })
-  }
-  return sdkPromises[url]
-}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -40,7 +23,6 @@ export default function Sign({ agreement, onSigned, onBack }) {
   const [mockAadhaar, setMockAadhaar] = useState('')
   const [mockOtp, setMockOtp] = useState('')
   const signed = current.status === 'signed'
-  const digioRef = useRef(null)
 
   const loadPdf = useCallback(async () => {
     setPdfErr('')
@@ -57,7 +39,6 @@ export default function Sign({ agreement, onSigned, onBack }) {
         const res = await api.startEsign(current.id)
         if (cancelled) return
         setEsign(res.esign)
-        if (res.esign.mode !== 'mock') await loadDigioSdk(res.esign.sdkUrl)
       } catch (e) {
         if (!cancelled) setPrepErr(e.message)
       }
@@ -89,31 +70,24 @@ export default function Sign({ agreement, onSigned, onBack }) {
     }
   }
 
-  const startSigning = () => {
+  const startSigning = async () => {
     setErr('')
     if (!consent) { toast('Tick the consent box to continue', 'warn'); return }
     if (!esign) { setErr(prepErr || 'Preparing your eSign request. Try again in a moment.'); return }
     if (esign.mode === 'mock') { setPhase('mock'); return }
-    if (!window.Digio) { setErr('The Digio eSign window is still loading. Try again in a moment.'); return }
-    const digio = new window.Digio({
-      environment: esign.environment,
-      logo: esign.logo || new URL(logoUrl, window.location.href).href,
-      theme: { primaryColor: '#1B6B3A', secondaryColor: '#123F24' },
-      is_iframe: true,
-      callback: (response) => {
-        if (response && Object.prototype.hasOwnProperty.call(response, 'error_code')) {
-          setErr(response.message || 'Signing was cancelled or failed. You can try again.')
-          setPhase('ready')
-          return
-        }
-        confirm({ txn_id: response?.txn_id, digio_doc_id: response?.digio_doc_id })
-      },
-    })
-    digioRef.current = digio
-    // init() must run inside the click so the browser allows the Digio window.
-    digio.init()
-    if (esign.accessToken) digio.submit(esign.documentId, esign.identifier, esign.accessToken)
-    else digio.submit(esign.documentId, esign.identifier)
+    // Same flow as the Growsin app: open Digio's hosted signing page in this tab.
+    // Digio sends the client back to /esign/complete, where the signature is confirmed.
+    setPhase('working')
+    try {
+      // Ask again so the link's one-hour Digio token is always fresh.
+      const res = await api.startEsign(current.id)
+      if (!res.esign?.signUrl) throw new Error('Could not open Digio. Please try again.')
+      window.location.assign(res.esign.signUrl)
+    } catch (e) {
+      if (e.status === 409) { await confirm({}); return }
+      setErr(e.message)
+      setPhase('ready')
+    }
   }
 
   const download = async () => {
@@ -183,7 +157,7 @@ export default function Sign({ agreement, onSigned, onBack }) {
               </label>
               {prepErr && <p className="err-box" role="alert">{prepErr}</p>}
               {err && <p className="err-box" role="alert">{err}</p>}
-              <p className="note">A secure Digio window opens. Enter your Aadhaar number and the OTP sent to your Aadhaar-linked mobile.</p>
+              <p className="note">You will be taken to Digio's secure page. Enter your Aadhaar number and the OTP sent to your Aadhaar-linked mobile, and you will come back here automatically.</p>
             </div>
           )}
         </div>
@@ -196,7 +170,7 @@ export default function Sign({ agreement, onSigned, onBack }) {
           ) : (
             <>
               <button type="button" className="btn ghost" onClick={onBack}>Edit details</button>
-              <button type="button" className="btn" onClick={startSigning} disabled={phase === 'working'} aria-disabled={!esign}>{phase === 'working' && <span className="spin" />}{phase === 'working' ? 'Confirming signature…' : 'Sign with Aadhaar'}</button>
+              <button type="button" className="btn" onClick={startSigning} disabled={phase === 'working'} aria-disabled={!esign}>{phase === 'working' && <span className="spin" />}{phase === 'working' ? 'Opening Digio…' : 'Sign with Aadhaar'}</button>
             </>
           )}
         </div>

@@ -1,6 +1,6 @@
 import { User, KYCData, RiskProfile, Plan, Agreement } from '../models/index.js';
 import { buildAgreementValues, renderAgreementPdf } from './agreementPdf.js';
-import { digioConfig, createSignRequest, getDocument, downloadSignedPdf, isCompleted, isFailed } from './digio.js';
+import { digioConfig, createSignRequest, getDocument, downloadSignedPdf, isCompleted, isFailed, signUrl } from './digio.js';
 import { CONTENT_PAGES } from '../config/agreementLayout.js';
 
 const httpError = (status, message) => Object.assign(new Error(message), { statusCode: status });
@@ -60,14 +60,24 @@ const signerIdentifier = (user, agreement, type) => {
 };
 
 /** Create (or reuse) the Digio Aadhaar eSign request. */
-export async function startEsign(userId, id) {
+// Digio's gateway access token lasts about an hour; make a fresh request before then.
+const ACCESS_TOKEN_MAX_AGE_MS = 50 * 60 * 1000;
+
+export async function startEsign(userId, id, returnBase) {
   const cfg = digioConfig();
   const agreement = await findOwnAgreement(userId, id, true);
   if (agreement.status === 'signed') throw httpError(409, 'This agreement is already signed');
   if (agreement.status === 'superseded') throw httpError(409, 'A newer agreement exists. Please generate it again.');
   const user = await User.findById(userId);
 
-  if (agreement.status !== 'sent_for_esign' || !agreement.esign?.documentId || agreement.esign.provider !== (cfg.mode === 'mock' ? 'mock' : 'digio')) {
+  const provider = cfg.mode === 'mock' ? 'mock' : 'digio';
+  if (agreement.status === 'sent_for_esign' && agreement.esign?.provider === provider && agreement.esign.documentId) {
+    // The client may already have signed an earlier request; settle that first.
+    const settled = await syncEsign(agreement).catch(() => agreement);
+    if (settled.status === 'signed') throw httpError(409, 'This agreement is already signed');
+  }
+  const stale = provider === 'digio' && (!agreement.esign?.requestedAt || Date.now() - new Date(agreement.esign.requestedAt).getTime() > ACCESS_TOKEN_MAX_AGE_MS);
+  if (agreement.status !== 'sent_for_esign' || !agreement.esign?.documentId || agreement.esign.provider !== provider || stale) {
     const identifier = signerIdentifier(user, agreement, cfg.identifierType);
     const { documentId, accessToken } = await createSignRequest({
       pdf: agreement.unsignedPdf,
@@ -94,9 +104,8 @@ export async function startEsign(userId, id) {
     documentId: agreement.esign.documentId,
     identifier: agreement.esign.identifier,
     accessToken: agreement.esign.accessToken || null,
-    sdkUrl: cfg.sdkUrl,
+    signUrl: signUrl({ documentId: agreement.esign.documentId, identifier: agreement.esign.identifier, accessToken: agreement.esign.accessToken, returnBase }),
     environment: cfg.mode === 'production' ? 'production' : 'sandbox',
-    logo: cfg.logo,
   };
 }
 
@@ -109,6 +118,8 @@ export async function syncEsign(agreement) {
   if (!agreement.esign?.documentId) throw httpError(400, 'eSign has not been started');
   const full = agreement.unsignedPdf ? agreement : await Agreement.findById(agreement._id).select('+unsignedPdf +signedPdf');
 
+  // A request made in test mode never counts once Digio is live (and vice versa).
+  if (full.esign.provider !== (digioConfig().mode === 'mock' ? 'mock' : 'digio')) return full;
   const doc = await getDocument(full.esign.documentId);
   if (isCompleted(doc)) {
     let signed;

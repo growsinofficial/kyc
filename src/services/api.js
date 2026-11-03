@@ -98,6 +98,7 @@ class ApiService {
   }
   startEsign(id) { return this.request(`/agreements/${id}/esign`, { method: 'POST' }) }
   completeEsign(id, payload = {}) { return this.request(`/agreements/${id}/esign/complete`, { method: 'POST', body: payload }) }
+  esignReturn(digioDocId) { return this.request('/agreements/esign/return', { method: 'POST', body: { digio_doc_id: digioDocId } }) }
 
   // ---- Payment ----
   initiatePayment(planId) { return this.request('/payments/initiate', { method: 'POST', body: { planId, paymentMethod: 'zoho' } }) }

@@ -10,6 +10,7 @@ import Details from './screens/Details'
 import Risk from './screens/Risk'
 import Review from './screens/Review'
 import Payment, { PaymentReturn, Done } from './screens/Payment'
+import EsignReturn from './screens/EsignReturn'
 
 // The signing screen carries the PDF viewer; load it only when needed.
 const Sign = lazy(() => import('./screens/Sign'))
@@ -33,6 +34,7 @@ function routeFromPath() {
   if (reset) return { name: 'reset', token: decodeURIComponent(reset[1]) }
   if (p.startsWith('/payment/success')) return { name: 'paid' }
   if (p.startsWith('/payment/cancel')) return { name: 'pay-cancel' }
+  if (p.startsWith('/esign/complete')) return { name: 'esign-return' }
   return { name: 'app' }
 }
 
@@ -164,6 +166,8 @@ function Onboarding() {
   else if (!user) content = <Auth onSignedIn={async (u) => { setExplicit(false); await loadAll(u) }} />
   else if (route.name === 'paid' || route.name === 'pay-cancel') {
     content = <PaymentReturn cancelled={route.name === 'pay-cancel'} onDone={async () => { leaveRoute(); await reload() }} onRetry={() => { leaveRoute(); go('payment') }} />
+  } else if (route.name === 'esign-return') {
+    content = <EsignReturn onSigned={async (a) => { leaveRoute(); setAgreement(a); await loadAll(user); go('sign') }} onRetry={() => { leaveRoute(); go('sign') }} />
   } else {
     switch (step) {
       case 'details':

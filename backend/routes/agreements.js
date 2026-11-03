@@ -53,12 +53,15 @@ router.get('/:id/pdf', protect, async (req, res, next) => {
   }
 });
 
-// @desc    Start Aadhaar eSign with Digio (returns what the Digio Web SDK needs)
+// Public origin of the onboarding screens; Digio sends the signer back here.
+const returnBase = (req) => process.env.FRONTEND_URL || `${req.protocol}://${req.get('host')}`;
+
+// @desc    Start Aadhaar eSign with Digio (returns the hosted signing link)
 // @route   POST /api/agreements/:id/esign
 // @access  Private
 router.post('/:id/esign', protect, async (req, res, next) => {
   try {
-    const esign = await startEsign(req.user._id, req.params.id);
+    const esign = await startEsign(req.user._id, req.params.id, returnBase(req));
     res.status(200).json({ success: true, esign });
   } catch (error) {
     next(error);
@@ -75,6 +78,24 @@ router.post('/:id/esign/complete', protect, async (req, res, next) => {
       agreement.esign.txnId = String(req.body.txn_id).slice(0, 100);
       agreement.markModified('esign');
     }
+    const synced = await syncEsign(agreement);
+    res.status(200).json({ success: true, agreement: synced.toClient() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @desc    Digio sent the signer back: re-check that request with Digio (the
+//          query string from the redirect is never trusted on its own)
+// @route   POST /api/agreements/esign/return
+// @access  Private
+router.post('/esign/return', protect, async (req, res, next) => {
+  try {
+    const docId = String(req.body?.digio_doc_id || '').slice(0, 100);
+    const query = { userId: req.user._id, status: { $in: ['sent_for_esign', 'signed', 'failed'] } };
+    if (docId) query['esign.documentId'] = docId;
+    const agreement = await Agreement.findOne(query).sort({ createdAt: -1 }).select('+unsignedPdf +signedPdf');
+    if (!agreement) return res.status(404).json({ success: false, error: 'No eSign request found for this account' });
     const synced = await syncEsign(agreement);
     res.status(200).json({ success: true, agreement: synced.toClient() });
   } catch (error) {

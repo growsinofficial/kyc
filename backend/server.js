@@ -68,15 +68,12 @@ app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 // Digio eSign webhooks: raw body for the optional checksum check
 app.use('/api/webhooks/digio', express.raw({ type: '*/*', limit: '2mb' }));
 
-const DIGIO_ORIGINS = ['https://ext.digio.in', 'https://ext.digio.in:444', 'https://app.digio.in', 'https://api.digio.in'];
+// Digio signing happens on Digio's own page (a redirect), so nothing from Digio runs here.
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   contentSecurityPolicy: {
     directives: {
-      'script-src': ["'self'", ...DIGIO_ORIGINS],
-      'frame-src': ["'self'", ...DIGIO_ORIGINS],
-      'connect-src': ["'self'", ...DIGIO_ORIGINS],
-      'img-src': ["'self'", 'data:', 'blob:', ...DIGIO_ORIGINS],
+      'img-src': ["'self'", 'data:', 'blob:'],
       'worker-src': ["'self'", 'blob:'],
     },
   },
@@ -124,7 +121,14 @@ const limiter = rateLimit({
 // before the API rate limiter so page assets do not use up a visitor's quota.
 const distDir = path.join(__dirname, '..', 'dist');
 const hasDist = fs.existsSync(path.join(distDir, 'index.html'));
-if (hasDist) app.use(express.static(distDir, { index: false, maxAge: '1h' }));
+if (hasDist) {
+  app.use(express.static(distDir, { index: false, maxAge: '1h' }));
+  // Single-page app: any other GET that is not an API call gets the onboarding page.
+  app.get(/^\/(?!api\/|uploads\/|health$).*/, (req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
 
 app.use(limiter);
 
@@ -165,14 +169,6 @@ app.use('/api/setup', setupRoutes);
 // OAuth Setup Routes (for Zoho Payments OAuth configuration)
 import oauthSetupRoutes from './routes/oauthSetup.js';
 app.use('/api/auth', oauthSetupRoutes);
-
-// Single-page app: any other GET that is not an API call gets the onboarding page.
-if (hasDist) {
-  app.get(/^\/(?!api\/|uploads\/|health$).*/, (req, res) => {
-    res.set('Cache-Control', 'no-cache');
-    res.sendFile(path.join(distDir, 'index.html'));
-  });
-}
 
 // 404 Handler
 app.use(notFound);

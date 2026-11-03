@@ -11,8 +11,8 @@ import { digioSignCoordinates } from '../config/agreementLayout.js';
  *   DIGIO_CLIENT_ID       client id for the chosen environment
  *   DIGIO_CLIENT_SECRET   client secret for the chosen environment
  *   DIGIO_WEBHOOK_SECRET  optional; webhook group secret from the Digio dashboard
- *   DIGIO_LOGO_URL        optional; logo shown in the Digio signing window
  *   DIGIO_SIGNER_IDENTIFIER  email | mobile (default email)
+ *   DIGIO_BASE_URL / DIGIO_GATEWAY_URL  optional host overrides (API / signing page)
  */
 const ENV = {
   sandbox: { api: 'https://ext.digio.in:444', app: 'https://ext.digio.in' },
@@ -31,11 +31,10 @@ export function digioConfig() {
   }
   return {
     mode,
-    api: ENV[mode]?.api,
-    app: ENV[mode]?.app,
-    sdkUrl: ENV[mode] ? `${ENV[mode].app}/sdk/v11/digio.js` : null,
+    // Optional overrides, same names as the Growsin app backend (growsin-console env.ts).
+    api: (mode !== 'mock' && process.env.DIGIO_BASE_URL) || ENV[mode]?.api,
+    app: (mode !== 'mock' && process.env.DIGIO_GATEWAY_URL?.replace(/\/$/, '')) || ENV[mode]?.app,
     identifierType: (process.env.DIGIO_SIGNER_IDENTIFIER || 'email').toLowerCase(),
-    logo: process.env.DIGIO_LOGO_URL || '',
   };
 }
 
@@ -84,6 +83,24 @@ export async function createSignRequest({ pdf, fileName, signer, reference }) {
   } catch (e) {
     throw digioError(e, 'create sign request');
   }
+}
+
+/** Where Digio sends the signer back to after signing (handled by the onboarding screens). */
+export const ESIGN_RETURN_PATH = '/esign/complete';
+
+/**
+ * Digio's hosted signing page, built the same way as Digio's web SDK
+ * (generateUrl) and the Growsin app backend (growsin-console digio.client.ts):
+ *   {gateway}/#/gateway/login/{documentId}/{txn}/{identifier}?token_id=GWT…&redirect_url=…&error_url=…
+ * Digio appends status=success|failure and digio_doc_id to the return URL.
+ */
+export function signUrl({ documentId, identifier, accessToken, returnBase }) {
+  const cfg = digioConfig();
+  if (cfg.mode === 'mock') return null;
+  const txn = crypto.randomBytes(4).toString('hex');
+  const back = encodeURIComponent(`${String(returnBase).replace(/\/$/, '')}${ESIGN_RETURN_PATH}`);
+  const params = [...(accessToken ? [`token_id=${accessToken}`] : []), `redirect_url=${back}`, `error_url=${back}`];
+  return `${cfg.app}/#/gateway/login/${documentId}/${txn}/${identifier}?${params.join('&')}`;
 }
 
 /** Document details: agreement_status and signing_parties[].status */
